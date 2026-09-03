@@ -186,6 +186,7 @@
     <select id="monthSelect"></select>
   </div>
   <div class="header-actions no-print">
+    <button id="btnDbSettings">⚙️ ฐานข้อมูลกลาง</button>
     <button id="btnSaveDraft">บันทึกร่าง</button>
     <button id="btnExport">⬇️ ดาวน์โหลดแบ็คอัพ</button>
     <button id="btnImport">⬆️ นำเข้าแบ็คอัพ</button>
@@ -239,9 +240,9 @@
   <section id="panel-staff" class="panel">
     <div class="card">
       <h2>เพิ่ม / แก้ไข เจ้าหน้าที่</h2>
-      <form id="staffForm" class="row">
+      <form id="staffForm" class="row" autocomplete="off">
         <input type="hidden" id="staffId">
-        <div class="field"><label>ชื่อ</label><input id="staffName" required></div>
+        <div class="field"><label>ชื่อ</label><input id="staffName" type="text" name="staff-display-name" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false" required></div>
         <div class="field"><label>ประเภท</label>
           <select id="staffType"><option value="RN">RN</option><option value="PN">PN</option></select>
         </div>
@@ -396,6 +397,7 @@
 <div id="modalRoot"></div>
 <div class="toast" id="toast"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
 /* ===================== CONSTANTS ===================== */
 const AREAS = ['R1','Open','RR'];
@@ -410,13 +412,48 @@ let currentMonthKey = null;
 let lastConflicts = [];
 
 /* ===================== STORAGE ===================== */
-// Uses Claude's window.storage when available (inside claude.ai artifacts).
-// Falls back to browser localStorage automatically when hosted elsewhere,
-// e.g. on GitHub Pages, so the app keeps working outside Claude.
+// Three possible backends, tried in this order:
+// 1) Supabase (shared, real-time, multi-user) — configured via the
+//    "⚙️ ฐานข้อมูลกลาง" button, saved locally per-browser as connection info.
+// 2) Claude's window.storage — only available inside claude.ai artifacts.
+// 3) Browser localStorage — single-device fallback, always available.
 const LS_PREFIX = 'or-morning-assignment:';
+const SB_CONFIG_KEY = LS_PREFIX+'supabase-config';
 const hasClaudeStorage = (typeof window !== 'undefined') && !!window.storage;
 
+let sb = null; // supabase client, if configured
+let sbChannel = null;
+
+function loadSupabaseConfig(){
+  try{
+    const raw = localStorage.getItem(SB_CONFIG_KEY);
+    return raw ? JSON.parse(raw) : null;
+  }catch(e){ return null; }
+}
+function saveSupabaseConfig(cfg){
+  if(cfg) localStorage.setItem(SB_CONFIG_KEY, JSON.stringify(cfg));
+  else localStorage.removeItem(SB_CONFIG_KEY);
+}
+function initSupabaseClient(){
+  const cfg = loadSupabaseConfig();
+  if(cfg && cfg.url && cfg.anonKey && typeof window.supabase !== 'undefined'){
+    try{
+      sb = window.supabase.createClient(cfg.url, cfg.anonKey);
+      return true;
+    }catch(e){ console.error('supabase init failed', e); sb = null; return false; }
+  }
+  sb = null;
+  return false;
+}
+
 async function storageGet(key, fallback){
+  if(sb){
+    try{
+      const { data, error } = await sb.from('kv_store').select('value').eq('key', key).maybeSingle();
+      if(error) throw error;
+      return data ? data.value : fallback;
+    }catch(e){ console.error('supabase get failed, falling back', key, e); }
+  }
   if(hasClaudeStorage){
     try{
       const r = await window.storage.get(key,false);
@@ -429,18 +466,39 @@ async function storageGet(key, fallback){
   }catch(e){ return fallback; }
 }
 async function storageSet(key, value){
+  if(sb){
+    try{
+      const { error } = await sb.from('kv_store').upsert({ key, value, updated_at: new Date().toISOString() });
+      if(error) throw error;
+      return;
+    }catch(e){ console.error('supabase set failed, falling back', key, e); }
+  }
   if(hasClaudeStorage){
-    try{ await window.storage.set(key, JSON.stringify(value), false); }
+    try{ await window.storage.set(key, JSON.stringify(value), false); return; }
     catch(e){ console.error('storage set failed', key, e); }
-    return;
   }
   try{ localStorage.setItem(LS_PREFIX+key, JSON.stringify(value)); }
   catch(e){ console.error('localStorage set failed', key, e); }
 }
 
+function subscribeRealtime(){
+  if(!sb) return;
+  if(sbChannel) sb.removeChannel(sbChannel);
+  let debounceTimer=null;
+  sbChannel = sb.channel('kv_store-changes')
+    .on('postgres_changes', { event:'*', schema:'public', table:'kv_store' }, (payload)=>{
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(async ()=>{
+        await loadAll();
+        renderAll();
+        toast('ข้อมูลอัปเดตจากผู้ใช้อื่น');
+      }, 400);
+    })
+    .subscribe();
+}
+
 /* ---- Manual backup: export / import full state as a .json file ----
-   This is the real backup for GitHub-Pages hosting, since localStorage
-   only lives inside one browser on one device. */
+   Useful as an extra safety net regardless of which backend is active. */
 function exportBackup(){
   const payload = { staff: STATE.staff, pairs: STATE.pairs, months: STATE.months, exportedAt: new Date().toISOString() };
   const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
@@ -467,6 +525,7 @@ async function importBackupFile(file){
   renderAll();
   toast('นำเข้าข้อมูลสำเร็จ');
 }
+
 
 async function saveAll(showToast){
   await storageSet(STORE_KEYS.STAFF, STATE.staff);
@@ -1377,6 +1436,70 @@ document.getElementById('btnPrint').addEventListener('click', ()=>{
   setTimeout(()=>window.print(), 100);
 });
 
+/* ===================== DB SETTINGS MODAL ===================== */
+function openDbSettings(){
+  const cfg = loadSupabaseConfig() || {url:'', anonKey:''};
+  const root = document.getElementById('modalRoot');
+  root.innerHTML = `<div class="modal-backdrop" onclick="if(event.target===this) closeModal();">
+    <div class="modal" style="width:380px;">
+      <h3>⚙️ ฐานข้อมูลกลาง (Supabase)</h3>
+      <p class="muted">ใส่ Project URL และ Anon Key จาก Supabase เพื่อให้ทุกคนที่เปิดลิงก์นี้เห็นข้อมูลชุดเดียวกันแบบเรียลไทม์ ปล่อยว่างไว้เพื่อใช้แบบเก็บในเครื่องเดียว (local)</p>
+      <div class="field" style="margin-bottom:8px;"><label>Project URL</label><input id="sbUrl" style="width:100%;" placeholder="https://xxxx.supabase.co" value="${cfg.url||''}"></div>
+      <div class="field" style="margin-bottom:8px;"><label>Anon public key</label><input id="sbKey" style="width:100%;" placeholder="eyJhbGciOi..." value="${cfg.anonKey||''}"></div>
+      <div class="muted" id="dbSettingsMsg"></div>
+      <div style="display:flex; justify-content:space-between; margin-top:12px;">
+        <button onclick="clearDbSettings()">ล้าง / ใช้แบบ local</button>
+        <div>
+          <button onclick="closeModal()">ยกเลิก</button>
+          <button class="primary" onclick="saveDbSettings()">บันทึกและเชื่อมต่อ</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+async function saveDbSettings(){
+  const url = document.getElementById('sbUrl').value.trim();
+  const anonKey = document.getElementById('sbKey').value.trim();
+  if(!url || !anonKey){ document.getElementById('dbSettingsMsg').textContent='กรุณากรอกทั้ง URL และ Key'; return; }
+  saveSupabaseConfig({url, anonKey});
+  const ok = initSupabaseClient();
+  if(!ok){ document.getElementById('dbSettingsMsg').textContent='เชื่อมต่อไม่สำเร็จ ตรวจสอบ URL/Key อีกครั้ง'; return; }
+  // quick connectivity check
+  try{
+    const { error } = await sb.from('kv_store').select('key').limit(1);
+    if(error) throw error;
+  }catch(e){
+    document.getElementById('dbSettingsMsg').textContent = 'เชื่อมต่อได้ แต่ยังไม่พบตาราง kv_store — ต้องรัน SQL ตั้งค่าตารางก่อน (ดูคำแนะนำที่ได้รับ)';
+    return;
+  }
+  subscribeRealtime();
+  await loadAll();
+  populateMonthSelect();
+  renderAll();
+  updateStorageNote();
+  closeModal();
+  toast('เชื่อมต่อฐานข้อมูลกลางสำเร็จ');
+}
+async function clearDbSettings(){
+  saveSupabaseConfig(null);
+  if(sbChannel && sb){ sb.removeChannel(sbChannel); sbChannel=null; }
+  sb = null;
+  await loadAll();
+  populateMonthSelect();
+  renderAll();
+  updateStorageNote();
+  closeModal();
+  toast('ปิดการเชื่อมต่อฐานข้อมูลกลางแล้ว ใช้ข้อมูลในเครื่องนี้แทน');
+}
+document.getElementById('btnDbSettings').addEventListener('click', openDbSettings);
+
+function updateStorageNote(){
+  const note = document.getElementById('storageNote');
+  if(sb) note.textContent = 'เชื่อมต่อฐานข้อมูลกลาง (Supabase) — ข้อมูลซิงค์แบบเรียลไทม์กับทุกคนที่ใช้ลิงก์นี้';
+  else if(hasClaudeStorage) note.textContent = 'บันทึกข้อมูลผ่าน Claude storage (ใช้ได้เฉพาะในแชทนี้/บัญชีนี้)';
+  else note.textContent = 'บันทึกข้อมูลไว้ในเบราว์เซอร์นี้เท่านั้น (localStorage) — กด "ดาวน์โหลดแบ็คอัพ" เป็นระยะเพื่อกันข้อมูลหาย และใช้ "นำเข้าแบ็คอัพ" เมื่อเปลี่ยนเครื่อง/เบราว์เซอร์';
+}
+
 /* ===================== INIT ===================== */
 function renderAll(){
   populateMonthSelect();
@@ -1389,10 +1512,9 @@ function renderAll(){
 }
 
 (async function init(){
-  const note = document.getElementById('storageNote');
-  note.textContent = hasClaudeStorage
-    ? 'บันทึกข้อมูลผ่าน Claude storage (ใช้ได้เฉพาะในแชทนี้/บัญชีนี้)'
-    : 'บันทึกข้อมูลไว้ในเบราว์เซอร์นี้เท่านั้น (localStorage) — กด "ดาวน์โหลดแบ็คอัพ" เป็นระยะเพื่อกันข้อมูลหาย และใช้ "นำเข้าแบ็คอัพ" เมื่อเปลี่ยนเครื่อง/เบราว์เซอร์';
+  initSupabaseClient();
+  if(sb) subscribeRealtime();
+  updateStorageNote();
   await loadAll();
   populateMonthSelect();
   renderAll();
