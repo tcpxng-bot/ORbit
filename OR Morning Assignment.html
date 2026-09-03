@@ -1,0 +1,1402 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OR Morning Assignment</title>
+<style>
+  :root{
+    --ink:#1f2a2e;
+    --ink-soft:#5b6b6f;
+    --paper:#faf9f6;
+    --line:#dfe3e0;
+    --r1:#d8e6f5;
+    --r1-ink:#2b5a86;
+    --open:#fffefb;
+    --open-line:#ece6d8;
+    --rr:#d9efdd;
+    --rr-ink:#2f7a45;
+    --x:#e3e5e4;
+    --x-ink:#5b6165;
+    --vac:#f6dbe4;
+    --vac-ink:#9c3f63;
+    --train:#faedc0;
+    --train-ink:#8a6d10;
+    --od:#e6e0f2;
+    --od-ink:#5f4a8c;
+    --danger:#c1443a;
+    --danger-bg:#fbe6e2;
+    --warn:#b8722a;
+    --warn-bg:#fbecd9;
+    --good:#2f7a45;
+    --good-bg:#e2f2e6;
+    --accent:#2b5a86;
+    --radius:8px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Sarabun,"Noto Sans Thai",Roboto,sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    font-size:14px;
+    line-height:1.4;
+  }
+  header.app-header{
+    position:sticky; top:0; z-index:50;
+    background:#fff; border-bottom:1px solid var(--line);
+    padding:10px 16px;
+    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  }
+  header.app-header h1{
+    font-size:16px; margin:0; font-weight:700; letter-spacing:.2px;
+    display:flex; align-items:center; gap:8px;
+  }
+  header.app-header h1 .dot{width:9px;height:9px;border-radius:50%;background:var(--accent);display:inline-block;}
+  .month-picker{display:flex; align-items:center; gap:6px; font-size:13px;}
+  .month-picker select{padding:5px 8px; border-radius:6px; border:1px solid var(--line); background:#fff;}
+  .header-actions{margin-left:auto; display:flex; gap:8px; flex-wrap:wrap;}
+  button{
+    font-family:inherit; font-size:13px; cursor:pointer;
+    border:1px solid var(--line); background:#fff; color:var(--ink);
+    padding:7px 12px; border-radius:7px; transition:background .12s,border-color .12s;
+  }
+  button:hover{background:#f2f1ec;}
+  button.primary{background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600;}
+  button.primary:hover{background:#234a70;}
+  button.ghost{background:transparent; border-color:transparent; color:var(--ink-soft);}
+  button:disabled{opacity:.4; cursor:not-allowed;}
+  button.danger{color:var(--danger); border-color:var(--danger-bg);}
+
+  nav.tabs{
+    display:flex; gap:2px; padding:0 16px; background:#fff; border-bottom:1px solid var(--line);
+    overflow-x:auto;
+  }
+  nav.tabs button{
+    border:none; border-bottom:2px solid transparent; border-radius:0; background:transparent;
+    padding:10px 12px; font-weight:600; color:var(--ink-soft); white-space:nowrap;
+  }
+  nav.tabs button.active{color:var(--accent); border-bottom-color:var(--accent);}
+
+  main{padding:16px; max-width:1500px; margin:0 auto;}
+  .panel{display:none;}
+  .panel.active{display:block;}
+
+  .card{background:#fff; border:1px solid var(--line); border-radius:var(--radius); padding:14px; margin-bottom:14px;}
+  .card h2{font-size:14px; margin:0 0 10px; font-weight:700;}
+  .card h3{font-size:13px; margin:14px 0 8px; font-weight:700; color:var(--ink-soft);}
+  .muted{color:var(--ink-soft); font-size:12.5px;}
+  .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center;}
+  .field{display:flex; flex-direction:column; gap:4px; font-size:12.5px;}
+  .field label{color:var(--ink-soft); font-weight:600;}
+  input,select{
+    font-family:inherit; font-size:13px; padding:6px 8px; border:1px solid var(--line); border-radius:6px; background:#fff;
+  }
+  table{border-collapse:collapse; width:100%; font-size:12.5px;}
+  th,td{padding:6px 8px; border-bottom:1px solid var(--line); text-align:left;}
+  th{color:var(--ink-soft); font-weight:700; font-size:11.5px; text-transform:uppercase; letter-spacing:.03em;}
+  .pill{display:inline-block; padding:2px 8px; border-radius:99px; font-size:11px; font-weight:700;}
+  .pill.yes{background:var(--good-bg); color:var(--good);}
+  .pill.no{background:#f0f0ee; color:#93958f;}
+  .crown{color:#c99a2e;}
+
+  /* Wizard */
+  .steps{display:flex; gap:6px; margin-bottom:16px; flex-wrap:wrap;}
+  .step-chip{
+    padding:8px 12px; border-radius:8px; border:1px solid var(--line); font-size:12.5px; font-weight:700;
+    background:#f5f4f0; color:var(--ink-soft); flex:1; min-width:140px; text-align:center;
+  }
+  .step-chip.active{background:#fff; border-color:var(--accent); color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset;}
+  .step-chip.done{background:var(--good-bg); color:var(--good); border-color:var(--good-bg);}
+  .step-chip.locked{opacity:.45;}
+
+  .entry-list{list-style:none; margin:8px 0 0; padding:0; display:flex; flex-direction:column; gap:6px;}
+  .entry-list li{display:flex; justify-content:space-between; align-items:center; background:#f6f5f1; padding:6px 10px; border-radius:6px; font-size:12.5px;}
+  .entry-list li button{padding:2px 8px; font-size:11px;}
+
+  .avail-day{border:1px solid var(--line); border-radius:8px; padding:10px; min-width:150px;}
+  .avail-day .d{font-weight:700; margin-bottom:4px;}
+  .status-ok{color:var(--good); font-weight:700;}
+  .status-bad{color:var(--danger); font-weight:700;}
+  .avail-grid{display:flex; gap:8px; flex-wrap:wrap;}
+
+  /* Main schedule table */
+  .table-wrap{overflow:auto; border:1px solid var(--line); border-radius:var(--radius); max-height:75vh; position:relative;}
+  table.schedule{white-space:nowrap;}
+  table.schedule th, table.schedule td{border:1px solid var(--line); text-align:center; padding:0;}
+  table.schedule thead th{
+    position:sticky; top:0; background:#fff; z-index:3; padding:6px 4px; font-size:11px;
+  }
+  table.schedule thead th.wk{color:#b7756f;}
+  table.schedule thead th:first-child{left:0; z-index:5; background:#fff;}
+  table.schedule tbody th{
+    position:sticky; left:0; background:#fff; z-index:2; text-align:left; padding:5px 8px; font-weight:600; font-size:12px; min-width:130px;
+  }
+  table.schedule td{min-width:34px; height:30px; cursor:pointer; font-weight:700; font-size:11.5px;}
+  td.cell-R1{background:var(--r1); color:var(--r1-ink);}
+  td.cell-Open{background:var(--open);}
+  td.cell-RR{background:var(--rr); color:var(--rr-ink);}
+  td.cell-X{background:var(--x); color:var(--x-ink);}
+  td.cell-vac{background:var(--vac); color:var(--vac-ink); font-size:10px;}
+  td.cell-train{background:var(--train); color:var(--train-ink); font-size:10px;}
+  td.cell-od{background:var(--od); color:var(--od-ink); font-size:10px;}
+  td.cell-unassigned{color:#c7c9c5;}
+  td:hover{outline:2px solid var(--accent); outline-offset:-2px;}
+  .acting-star{font-size:9px; vertical-align:super;}
+
+  .legend{display:flex; gap:14px; flex-wrap:wrap; margin-top:10px; font-size:12px; color:var(--ink-soft);}
+  .legend span.sw{display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:4px; vertical-align:-2px;}
+
+  .conflict-item{padding:8px 10px; border-radius:7px; margin-bottom:6px; font-size:12.5px; cursor:pointer;}
+  .conflict-item.error{background:var(--danger-bg); color:var(--danger);}
+  .conflict-item.warn{background:var(--warn-bg); color:var(--warn);}
+
+  .incharge-box{display:flex; gap:12px; flex-wrap:wrap;}
+  .incharge-card{border:1px solid var(--line); border-radius:8px; padding:10px 14px; min-width:160px;}
+  .incharge-card .area{font-size:11px; color:var(--ink-soft); font-weight:700; text-transform:uppercase;}
+  .incharge-card .name{font-size:14px; font-weight:700; margin-top:2px;}
+
+  .modal-backdrop{position:fixed; inset:0; background:rgba(20,20,20,.35); display:flex; align-items:center; justify-content:center; z-index:100;}
+  .modal{background:#fff; border-radius:10px; padding:16px; width:320px; max-width:92vw;}
+  .modal h3{margin-top:0;}
+  .modal .opts{display:flex; flex-wrap:wrap; gap:6px; margin:10px 0;}
+  .modal .opts button{min-width:56px;}
+  .toast{position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:var(--ink); color:#fff; padding:9px 16px; border-radius:8px; font-size:13px; z-index:200; opacity:0; transition:opacity .2s;}
+  .toast.show{opacity:1;}
+
+  @media print{
+    header.app-header, nav.tabs, .no-print{display:none !important;}
+    .panel{display:none !important;}
+    .panel.print-target{display:block !important;}
+    body{background:#fff;}
+    .table-wrap{max-height:none; overflow:visible; border:none;}
+  }
+  @media (max-width:700px){
+    table.schedule tbody th{min-width:96px;}
+    .header-actions{width:100%; order:3;}
+  }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <h1><span class="dot"></span>OR Morning Assignment</h1>
+  <div class="month-picker">
+    <label class="muted">เดือน:</label>
+    <select id="monthSelect"></select>
+  </div>
+  <div class="header-actions no-print">
+    <button id="btnSaveDraft">บันทึกร่าง</button>
+    <button id="btnExport">⬇️ ดาวน์โหลดแบ็คอัพ</button>
+    <button id="btnImport">⬆️ นำเข้าแบ็คอัพ</button>
+    <input type="file" id="importFile" accept="application/json" style="display:none;">
+    <button id="btnResetDemo" class="danger">รีเซ็ตข้อมูลตัวอย่าง</button>
+    <button id="btnPrint">พิมพ์ตาราง</button>
+  </div>
+</header>
+
+<div class="no-print" style="padding:4px 16px; font-size:11.5px; color:var(--ink-soft); background:#fff; border-bottom:1px solid var(--line);" id="storageNote"></div>
+
+<nav class="tabs no-print">
+  <button data-tab="dashboard" class="active">ตารางประจำเดือน</button>
+  <button data-tab="staff">จัดการเจ้าหน้าที่</button>
+  <button data-tab="pairs">ข้อจำกัดคู่</button>
+  <button data-tab="wizard">เตรียมข้อมูลรายเดือน</button>
+  <button data-tab="conflicts">ข้อขัดแย้ง</button>
+  <button data-tab="report">รายงานสรุป</button>
+</nav>
+
+<main>
+
+  <!-- DASHBOARD -->
+  <section id="panel-dashboard" class="panel active print-target">
+    <div class="card">
+      <div class="row" style="justify-content:space-between;">
+        <h2 id="dashTitle">ตารางมอบหมายประจำเดือน</h2>
+        <div class="row no-print">
+          <button id="btnAutoAssignTop" class="primary">✨ Auto Assign ทั้งเดือน</button>
+          <button id="btnConfirmSchedule">✓ ยืนยันตารางเดือนนี้</button>
+        </div>
+      </div>
+      <div class="incharge-box" id="inchargeBox"></div>
+      <div class="table-wrap" style="margin-top:12px;">
+        <table class="schedule" id="scheduleTable"></table>
+      </div>
+      <div class="legend">
+        <span><span class="sw" style="background:var(--r1)"></span>R1 (Laparo)</span>
+        <span><span class="sw" style="background:var(--open); border:1px solid var(--open-line)"></span>Open (ช่องว่าง)</span>
+        <span><span class="sw" style="background:var(--rr)"></span>RR (Recovery)</span>
+        <span><span class="sw" style="background:var(--x)"></span>X ขอหยุด</span>
+        <span><span class="sw" style="background:var(--vac)"></span>vac ลาพักร้อน</span>
+        <span><span class="sw" style="background:var(--train)"></span>อบรม</span>
+        <span><span class="sw" style="background:var(--od)"></span>OD</span>
+        <span>— ไม่ได้จัด &nbsp; 👑 Incharge ประจำเดือน &nbsp; 👑* Acting Incharge</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- STAFF MANAGEMENT -->
+  <section id="panel-staff" class="panel">
+    <div class="card">
+      <h2>เพิ่ม / แก้ไข เจ้าหน้าที่</h2>
+      <form id="staffForm" class="row">
+        <input type="hidden" id="staffId">
+        <div class="field"><label>ชื่อ</label><input id="staffName" required></div>
+        <div class="field"><label>ประเภท</label>
+          <select id="staffType"><option value="RN">RN</option><option value="PN">PN</option></select>
+        </div>
+        <div class="field"><label>วันเริ่มงาน</label><input type="date" id="staffStart" required></div>
+        <div class="field"><label>สถานะ</label>
+          <select id="staffActive"><option value="1">Active</option><option value="0">Inactive</option></select>
+        </div>
+        <div class="field"><label>ทำงาน R1</label><select id="compR1"><option value="1">Yes</option><option value="0">No</option></select></div>
+        <div class="field"><label>ทำงาน Open</label><select id="compOpen"><option value="1">Yes</option><option value="0">No</option></select></div>
+        <div class="field"><label>ทำงาน RR</label><select id="compRR"><option value="0">No</option><option value="1">Yes</option></select></div>
+        <div class="field"><label>Incharge R1</label><select id="inchR1"><option value="0">No</option><option value="1">Yes</option></select></div>
+        <div class="field"><label>Incharge Open</label><select id="inchOpen"><option value="0">No</option><option value="1">Yes</option></select></div>
+        <div class="field"><label>Incharge RR</label><select id="inchRR"><option value="0">No</option><option value="1">Yes</option></select></div>
+        <div class="field"><label>&nbsp;</label><button type="submit" class="primary">บันทึกเจ้าหน้าที่</button></div>
+        <div class="field" id="cancelEditWrap" style="display:none;"><label>&nbsp;</label><button type="button" id="btnCancelEdit">ยกเลิกแก้ไข</button></div>
+      </form>
+      <p class="muted">หมายเหตุ: PN ไม่สามารถทำงาน RR และไม่สามารถเป็น Incharge ได้ (ระบบจะบังคับเป็น No อัตโนมัติ)</p>
+    </div>
+    <div class="card">
+      <h2>รายชื่อเจ้าหน้าที่</h2>
+      <div style="overflow:auto;">
+      <table id="staffTable">
+        <thead><tr><th>ชื่อ</th><th>ประเภท</th><th>ประสบการณ์</th><th>R1</th><th>Open</th><th>RR</th><th>Incharge R1</th><th>Incharge Open</th><th>Incharge RR</th><th>สถานะ</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+      </div>
+    </div>
+    <div class="card">
+      <h2>👑 Incharge ประจำเดือน (<span id="inchargeMonthLabel"></span>)</h2>
+      <div class="row">
+        <div class="field"><label>R1 Incharge</label><select id="inchargeSetR1"></select></div>
+        <div class="field"><label>Open Incharge</label><select id="inchargeSetOpen"></select></div>
+        <div class="field"><label>RR Incharge</label><select id="inchargeSetRR"></select></div>
+        <div class="field"><label>&nbsp;</label><button id="btnSaveIncharge" class="primary">บันทึก Incharge เดือนนี้</button></div>
+      </div>
+      <p class="muted">Incharge ประจำเดือนควรตั้งค่าไว้ล่วงหน้า ก่อนเริ่มขั้นตอนเตรียมข้อมูลรายเดือน</p>
+    </div>
+  </section>
+
+  <!-- PAIR RESTRICTIONS -->
+  <section id="panel-pairs" class="panel">
+    <div class="card">
+      <h2>ข้อจำกัดคู่ (Pair Restrictions)</h2>
+      <p class="muted">บุคคลสองคนนี้จะไม่ถูกจัดให้อยู่ Area เดียวกันในวันเดียวกัน (Hard Constraint)</p>
+      <div class="row">
+        <div class="field"><label>คนที่ 1</label><select id="pairA"></select></div>
+        <div class="field"><label>คนที่ 2</label><select id="pairB"></select></div>
+        <div class="field"><label>&nbsp;</label><button id="btnAddPair" class="primary">เพิ่มข้อจำกัด</button></div>
+      </div>
+      <ul class="entry-list" id="pairList"></ul>
+    </div>
+  </section>
+
+  <!-- WIZARD -->
+  <section id="panel-wizard" class="panel">
+    <div class="steps" id="stepsBar"></div>
+
+    <div class="card" id="stepPanel-1">
+      <h2>🌴 Step 1 — Vacation</h2>
+      <div class="row">
+        <div class="field"><label>เจ้าหน้าที่</label><select id="vacStaff"></select></div>
+        <div class="field"><label>ตั้งแต่วันที่</label><input type="date" id="vacFrom"></div>
+        <div class="field"><label>ถึงวันที่</label><input type="date" id="vacTo"></div>
+        <div class="field"><label>&nbsp;</label><button id="btnAddVac" class="primary">เพิ่ม Vacation</button></div>
+      </div>
+      <ul class="entry-list" id="vacList"></ul>
+      <div class="row" style="margin-top:12px;">
+        <button id="btnConfirmVac" class="primary">✓ ยืนยัน Vacation ครบแล้ว</button>
+      </div>
+    </div>
+
+    <div class="card" id="stepPanel-2">
+      <h2>❌ Step 2 — Requested Off (X)</h2>
+      <div class="row">
+        <div class="field"><label>เจ้าหน้าที่</label><select id="offStaff"></select></div>
+        <div class="field"><label>ตั้งแต่วันที่</label><input type="date" id="offFrom"></div>
+        <div class="field"><label>ถึงวันที่</label><input type="date" id="offTo"></div>
+        <div class="field"><label>&nbsp;</label><button id="btnAddOff" class="primary">เพิ่ม X</button></div>
+      </div>
+      <ul class="entry-list" id="offList"></ul>
+      <div class="row" style="margin-top:12px;">
+        <button id="btnConfirmOff" class="primary">✓ ยืนยันวันขอหยุดครบแล้ว</button>
+      </div>
+    </div>
+
+    <div class="card" id="stepPanel-3">
+      <h2>📚 Step 3 — Training</h2>
+      <div class="row">
+        <div class="field"><label>เจ้าหน้าที่</label><select id="trainStaff"></select></div>
+        <div class="field"><label>ตั้งแต่วันที่</label><input type="date" id="trainFrom"></div>
+        <div class="field"><label>ถึงวันที่</label><input type="date" id="trainTo"></div>
+        <div class="field"><label>&nbsp;</label><button id="btnAddTrain" class="primary">เพิ่ม อบรม</button></div>
+      </div>
+      <ul class="entry-list" id="trainList"></ul>
+      <div class="row" style="margin-top:12px;">
+        <button id="btnConfirmTrain" class="primary">✓ ยืนยันข้อมูลอบรมครบแล้ว</button>
+      </div>
+    </div>
+
+    <div class="card" id="stepPanel-3b">
+      <h2>OD — Other Duty <span class="muted">(ไม่บังคับตามลำดับขั้นตอน)</span></h2>
+      <div class="row">
+        <div class="field"><label>เจ้าหน้าที่</label><select id="odStaff"></select></div>
+        <div class="field"><label>ตั้งแต่วันที่</label><input type="date" id="odFrom"></div>
+        <div class="field"><label>ถึงวันที่</label><input type="date" id="odTo"></div>
+        <div class="field"><label>&nbsp;</label><button id="btnAddOd" class="primary">เพิ่ม OD</button></div>
+      </div>
+      <ul class="entry-list" id="odList"></ul>
+    </div>
+
+    <div class="card" id="stepPanel-4">
+      <h2>👥 Step 4 — Available Staff Review</h2>
+      <div class="avail-grid" id="availGrid"></div>
+    </div>
+
+    <div class="card" id="stepPanel-5">
+      <h2>👑 Step 5 — Check Incharge Availability</h2>
+      <div id="inchargeCheck"></div>
+    </div>
+
+    <div class="card" id="stepPanel-6">
+      <h2>✨ Step 6 — Auto Assign ทั้งเดือน</h2>
+      <p class="muted">ต้องยืนยัน Vacation, X และ อบรม ให้ครบก่อน จึงจะสามารถ Auto Assign ได้</p>
+      <button id="btnAutoAssign" class="primary">✨ Auto Assign ทั้งเดือน</button>
+      <div id="autoAssignResult" style="margin-top:10px;"></div>
+    </div>
+  </section>
+
+  <!-- CONFLICTS -->
+  <section id="panel-conflicts" class="panel">
+    <div class="card">
+      <h2>🚨 Conflict Panel</h2>
+      <div id="conflictList"></div>
+    </div>
+  </section>
+
+  <!-- REPORT -->
+  <section id="panel-report" class="panel">
+    <div class="card">
+      <h2>📊 Balance Report</h2>
+      <div style="overflow:auto;">
+      <table id="reportTable">
+        <thead><tr><th>ชื่อ</th><th>ประเภท</th><th>R1</th><th>Open</th><th>RR</th><th>X</th><th>Vacation</th><th>อบรม</th><th>Acting Incharge</th><th>รวมเวร</th><th>ส่วนต่างจากค่าเฉลี่ย</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div id="modalRoot"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===================== CONSTANTS ===================== */
+const AREAS = ['R1','Open','RR'];
+const AREA_LABEL = {R1:'R1 (Laparo)', Open:'Open', RR:'RR (Recovery)'};
+const ROOM4 = ['R1','Open'];
+const LOCK_TYPES = ['vac','X','อบรม','OD'];
+const WEEKDAY_TH = ['อา','จ','อ','พ','พฤ','ศ','ส'];
+const STORE_KEYS = { STAFF:'staff-list', PAIRS:'pair-restrictions', MONTHS:'month-index' };
+
+let STATE = { staff: [], pairs: [], months: {} }; // months: { 'YYYY-M': monthDataObject }
+let currentMonthKey = null;
+let lastConflicts = [];
+
+/* ===================== STORAGE ===================== */
+// Uses Claude's window.storage when available (inside claude.ai artifacts).
+// Falls back to browser localStorage automatically when hosted elsewhere,
+// e.g. on GitHub Pages, so the app keeps working outside Claude.
+const LS_PREFIX = 'or-morning-assignment:';
+const hasClaudeStorage = (typeof window !== 'undefined') && !!window.storage;
+
+async function storageGet(key, fallback){
+  if(hasClaudeStorage){
+    try{
+      const r = await window.storage.get(key,false);
+      return r ? JSON.parse(r.value) : fallback;
+    }catch(e){ return fallback; }
+  }
+  try{
+    const raw = localStorage.getItem(LS_PREFIX+key);
+    return raw!==null ? JSON.parse(raw) : fallback;
+  }catch(e){ return fallback; }
+}
+async function storageSet(key, value){
+  if(hasClaudeStorage){
+    try{ await window.storage.set(key, JSON.stringify(value), false); }
+    catch(e){ console.error('storage set failed', key, e); }
+    return;
+  }
+  try{ localStorage.setItem(LS_PREFIX+key, JSON.stringify(value)); }
+  catch(e){ console.error('localStorage set failed', key, e); }
+}
+
+/* ---- Manual backup: export / import full state as a .json file ----
+   This is the real backup for GitHub-Pages hosting, since localStorage
+   only lives inside one browser on one device. */
+function exportBackup(){
+  const payload = { staff: STATE.staff, pairs: STATE.pairs, months: STATE.months, exportedAt: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const {y,m} = currentMonthKey ? parseMonthKey(currentMonthKey) : {y:new Date().getFullYear(), m:new Date().getMonth()};
+  a.href = url;
+  a.download = `or-morning-assignment-backup-${y}-${pad2(m+1)}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+async function importBackupFile(file){
+  const text = await file.text();
+  let data;
+  try{ data = JSON.parse(text); }catch(e){ toast('ไฟล์ไม่ถูกต้อง อ่านไม่ได้'); return; }
+  if(!data || !Array.isArray(data.staff)){ toast('ไฟล์นี้ไม่ใช่ไฟล์แบ็คอัพของแอปนี้'); return; }
+  if(!confirm('นำเข้าข้อมูลนี้จะเขียนทับข้อมูลปัจจุบันทั้งหมด ต้องการดำเนินการต่อหรือไม่?')) return;
+  STATE.staff = data.staff || [];
+  STATE.pairs = data.pairs || [];
+  STATE.months = data.months || {};
+  await saveAll(false);
+  currentMonthKey = null;
+  populateMonthSelect();
+  renderAll();
+  toast('นำเข้าข้อมูลสำเร็จ');
+}
+
+async function saveAll(showToast){
+  await storageSet(STORE_KEYS.STAFF, STATE.staff);
+  await storageSet(STORE_KEYS.PAIRS, STATE.pairs);
+  await storageSet(STORE_KEYS.MONTHS, Object.keys(STATE.months));
+  for(const mk of Object.keys(STATE.months)){
+    await storageSet('month:'+mk, STATE.months[mk]);
+  }
+  if(showToast) toast('บันทึกข้อมูลแล้ว');
+}
+
+async function loadAll(){
+  STATE.staff = await storageGet(STORE_KEYS.STAFF, null);
+  STATE.pairs = await storageGet(STORE_KEYS.PAIRS, []);
+  const monthKeys = await storageGet(STORE_KEYS.MONTHS, []);
+  STATE.months = {};
+  for(const mk of monthKeys){
+    STATE.months[mk] = await storageGet('month:'+mk, null);
+  }
+  if(!STATE.staff){
+    await buildDemoData();
+  }
+}
+
+/* ===================== UTIL ===================== */
+function uid(prefix){ return prefix+'_'+Math.random().toString(36).slice(2,9); }
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),1800);
+}
+function pad2(n){ return String(n).padStart(2,'0'); }
+function dstr(y,m,d){ return `${y}-${pad2(m+1)}-${pad2(d)}`; } // m is 0-based
+function monthKeyOf(y,m){ return `${y}-${pad2(m+1)}`; }
+function parseMonthKey(mk){ const [y,m]=mk.split('-').map(Number); return {y, m:m-1}; }
+function daysInMonth(y,m){ return new Date(y,m+1,0).getDate(); }
+function isWeekend(y,m,d){ const wd=new Date(y,m,d).getDay(); return wd===0||wd===6; }
+function workingDays(y,m){
+  const n=daysInMonth(y,m); const out=[];
+  for(let d=1; d<=n; d++){ if(!isWeekend(y,m,d)) out.push(d); }
+  return out;
+}
+function beYear(y){ return y+543; }
+function thaiMonthName(m){
+  return ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'][m];
+}
+function yearsExperience(startDate){
+  const s=new Date(startDate); const now=new Date();
+  let years = now.getFullYear()-s.getFullYear();
+  const m = now.getMonth()-s.getMonth();
+  if(m<0 || (m===0 && now.getDate()<s.getDate())) years--;
+  return Math.max(0,years);
+}
+function experienceGroup(years){
+  if(years>=10) return 'Senior';
+  if(years>=5) return 'Experienced';
+  if(years>=2) return 'Intermediate';
+  return 'Junior';
+}
+function staffById(id){ return STATE.staff.find(s=>s.id===id); }
+function activeStaff(){ return STATE.staff.filter(s=>s.active); }
+
+function ensureMonth(mk){
+  if(!STATE.months[mk]){
+    STATE.months[mk] = {
+      incharge: {R1:null, Open:null, RR:null},
+      status: {},   // status[staffId][dateStr] = 'vac'|'X'|'อบรม'|'OD'
+      assign: {},   // assign[staffId][dateStr] = {area:'R1'|'Open'|'RR', acting:bool}
+      workflow: { vacationConfirmed:false, offConfirmed:false, trainingConfirmed:false, scheduleConfirmed:false },
+      actingLog: {},
+      conflicts: []
+    };
+  }
+  return STATE.months[mk];
+}
+function getStatus(md, staffId, ds){ return md.status[staffId] ? md.status[staffId][ds] : undefined; }
+function setStatus(md, staffId, ds, val){
+  if(!md.status[staffId]) md.status[staffId]={};
+  if(val===null){ delete md.status[staffId][ds]; } else { md.status[staffId][ds]=val; }
+}
+function getAssign(md, staffId, ds){ return md.assign[staffId] ? md.assign[staffId][ds] : undefined; }
+function setAssign(md, staffId, ds, area, acting){
+  if(!md.assign[staffId]) md.assign[staffId]={};
+  if(area===null){ delete md.assign[staffId][ds]; } else { md.assign[staffId][ds] = {area, acting: !!acting}; }
+}
+
+/* ===================== DEMO DATA ===================== */
+async function buildDemoData(){
+  const today = new Date();
+  const names = [
+    ['RN A','RN'],['RN B','RN'],['RN C','RN'],['RN D','RN'],['RN E','RN'],
+    ['RN F','RN'],['RN G','RN'],['RN H','RN'],['RN I','RN'],['RN J','RN'],
+    ['PN A','PN'],['PN B','PN'],['PN C','PN']
+  ];
+  const startOffsets = [12,10,8,6,5,4,3,2,1.5,0.7,7,3,1]; // years ago approx
+  STATE.staff = names.map(([name,type],i)=>{
+    const yearsAgo = startOffsets[i];
+    const start = new Date(today.getFullYear()-Math.floor(yearsAgo), today.getMonth()-Math.round((yearsAgo%1)*12), today.getDate());
+    return {
+      id: uid('st'), name, type, active:true,
+      startDate: start.toISOString().slice(0,10),
+      comp: { R1:true, Open:true, RR: type==='RN' },
+      inch: { R1:false, Open:false, RR:false }
+    };
+  });
+  // customize competencies per spec: not everyone can do everything, some R1 but not incharge
+  const byName = n => STATE.staff.find(s=>s.name===n);
+  byName('RN A').inch = {R1:true, Open:false, RR:false};
+  byName('RN B').inch = {R1:false, Open:true, RR:false};
+  byName('RN C').inch = {R1:false, Open:false, RR:true};
+  byName('RN D').inch = {R1:true, Open:false, RR:false}; // ห้อง4, can act as R1 incharge
+  byName('RN D').comp = {R1:true, Open:true, RR:false};
+  byName('RN E').inch = {R1:false, Open:false, RR:false};
+  byName('RN E').comp = {R1:true, Open:true, RR:false};
+  byName('RN F').comp = {R1:false, Open:false, RR:true};
+  byName('RN F').inch = {R1:true, Open:false, RR:true}; // RR nurse who could act R1 incharge but should be last resort
+  byName('RN G').comp = {R1:true, Open:true, RR:false};
+  byName('RN G').inch = {R1:false, Open:false, RR:false};
+  byName('RN H').comp = {R1:true, Open:true, RR:true};
+  byName('RN H').inch = {R1:false, Open:true, RR:false};
+  byName('RN I').comp = {R1:true, Open:true, RR:false};
+  byName('RN I').inch = {R1:false, Open:false, RR:false};
+  byName('RN J').comp = {R1:false, Open:true, RR:true};
+  byName('RN J').inch = {R1:false, Open:false, RR:true};
+  ['PN A','PN B','PN C'].forEach(n=>{ const s=byName(n); s.comp={R1:true,Open:true,RR:false}; s.inch={R1:false,Open:false,RR:false}; });
+
+  STATE.pairs = [
+    { a: byName('RN E').id, b: byName('RN G').id },
+    { a: byName('PN A').id, b: byName('PN B').id }
+  ];
+
+  const y = today.getFullYear(), m = today.getMonth();
+  const mk = monthKeyOf(y,m);
+  const md = ensureMonth(mk);
+  md.incharge = { R1: byName('RN A').id, Open: byName('RN B').id, RR: byName('RN C').id };
+
+  // Demo: RN A (R1 incharge) is X on the 3rd working day -> acting incharge should come from ห้อง4 (RN D)
+  const wds = workingDays(y,m);
+  if(wds.length>2){
+    setStatus(md, byName('RN A').id, dstr(y,m,wds[2]), 'X');
+  }
+  // Demo: vacation example
+  if(wds.length>5){
+    setStatus(md, byName('RN E').id, dstr(y,m,wds[3]), 'vac');
+    setStatus(md, byName('RN E').id, dstr(y,m,wds[4]), 'vac');
+    setStatus(md, byName('RN E').id, dstr(y,m,wds[5]), 'vac');
+  }
+  // Demo training
+  if(wds.length>1) setStatus(md, byName('RN I').id, dstr(y,m,wds[1]), 'อบรม');
+  // Demo OD
+  if(wds.length>4) setStatus(md, byName('PN C').id, dstr(y,m,wds[4]), 'OD');
+  // Demo: no ห้อง4 acting available for Open incharge on a later day (RN B off, and make RN H/others unavailable that day is complex; instead just leave as scenario handled live)
+  if(wds.length>7){
+    setStatus(md, byName('RN B').id, dstr(y,m,wds[7]), 'X');
+    setStatus(md, byName('RN H').id, dstr(y,m,wds[7]), 'X'); // remove the other ห้อง4 open-incharge-capable person too
+  }
+
+  await saveAll(false);
+}
+
+/* ===================== TABS ===================== */
+document.querySelectorAll('nav.tabs button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
+    if(btn.dataset.tab==='wizard') renderWizard();
+    if(btn.dataset.tab==='conflicts') renderConflicts();
+    if(btn.dataset.tab==='report') renderReport();
+    if(btn.dataset.tab==='staff') renderStaffTab();
+    if(btn.dataset.tab==='pairs') renderPairsTab();
+    if(btn.dataset.tab==='dashboard') renderDashboard();
+  });
+});
+
+/* ===================== MONTH SELECT ===================== */
+function populateMonthSelect(){
+  const sel = document.getElementById('monthSelect');
+  const today = new Date();
+  const keys = new Set(Object.keys(STATE.months));
+  // ensure current + next 2 months exist as options
+  for(let i=-1;i<=2;i++){
+    const d = new Date(today.getFullYear(), today.getMonth()+i, 1);
+    keys.add(monthKeyOf(d.getFullYear(), d.getMonth()));
+  }
+  const sorted = Array.from(keys).sort();
+  sel.innerHTML = sorted.map(mk=>{
+    const {y,m} = parseMonthKey(mk);
+    return `<option value="${mk}">${thaiMonthName(m)} ${beYear(y)}</option>`;
+  }).join('');
+  if(!currentMonthKey || !sorted.includes(currentMonthKey)){
+    currentMonthKey = monthKeyOf(today.getFullYear(), today.getMonth());
+  }
+  sel.value = currentMonthKey;
+  ensureMonth(currentMonthKey);
+}
+document.getElementById('monthSelect').addEventListener('change', (e)=>{
+  currentMonthKey = e.target.value;
+  ensureMonth(currentMonthKey);
+  renderAll();
+});
+
+/* ===================== STAFF TAB ===================== */
+function fillStaffSelects(){
+  const opts = activeStaff().map(s=>`<option value="${s.id}">${s.name} (${s.type})</option>`).join('');
+  ['vacStaff','offStaff','trainStaff','odStaff','pairA','pairB'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.innerHTML = opts;
+  });
+  const rnOpts = activeStaff().filter(s=>s.type==='RN').map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+  ['inchargeSetR1','inchargeSetOpen','inchargeSetRR'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.innerHTML = `<option value="">-- ไม่กำหนด --</option>`+rnOpts;
+  });
+}
+
+document.getElementById('staffType').addEventListener('change', (e)=>{
+  if(e.target.value==='PN'){
+    document.getElementById('compRR').value='0';
+    document.getElementById('inchR1').value='0';
+    document.getElementById('inchOpen').value='0';
+    document.getElementById('inchRR').value='0';
+  }
+});
+
+document.getElementById('staffForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const id = document.getElementById('staffId').value;
+  const type = document.getElementById('staffType').value;
+  const isPN = type==='PN';
+  const obj = {
+    id: id || uid('st'),
+    name: document.getElementById('staffName').value.trim(),
+    type,
+    active: document.getElementById('staffActive').value==='1',
+    startDate: document.getElementById('staffStart').value,
+    comp: {
+      R1: document.getElementById('compR1').value==='1',
+      Open: document.getElementById('compOpen').value==='1',
+      RR: isPN ? false : document.getElementById('compRR').value==='1'
+    },
+    inch: {
+      R1: isPN ? false : document.getElementById('inchR1').value==='1',
+      Open: isPN ? false : document.getElementById('inchOpen').value==='1',
+      RR: isPN ? false : document.getElementById('inchRR').value==='1'
+    }
+  };
+  if(id){
+    const idx = STATE.staff.findIndex(s=>s.id===id);
+    STATE.staff[idx] = obj;
+  } else {
+    STATE.staff.push(obj);
+  }
+  await saveAll(true);
+  document.getElementById('staffForm').reset();
+  document.getElementById('staffId').value='';
+  document.getElementById('cancelEditWrap').style.display='none';
+  renderStaffTab();
+});
+document.getElementById('btnCancelEdit').addEventListener('click', ()=>{
+  document.getElementById('staffForm').reset();
+  document.getElementById('staffId').value='';
+  document.getElementById('cancelEditWrap').style.display='none';
+});
+
+function editStaff(id){
+  const s = staffById(id);
+  document.getElementById('staffId').value = s.id;
+  document.getElementById('staffName').value = s.name;
+  document.getElementById('staffType').value = s.type;
+  document.getElementById('staffStart').value = s.startDate;
+  document.getElementById('staffActive').value = s.active ? '1':'0';
+  document.getElementById('compR1').value = s.comp.R1 ? '1':'0';
+  document.getElementById('compOpen').value = s.comp.Open ? '1':'0';
+  document.getElementById('compRR').value = s.comp.RR ? '1':'0';
+  document.getElementById('inchR1').value = s.inch.R1 ? '1':'0';
+  document.getElementById('inchOpen').value = s.inch.Open ? '1':'0';
+  document.getElementById('inchRR').value = s.inch.RR ? '1':'0';
+  document.getElementById('cancelEditWrap').style.display='';
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+async function toggleActive(id){
+  const s = staffById(id); s.active = !s.active;
+  await saveAll(true); renderStaffTab();
+}
+
+function renderStaffTab(){
+  fillStaffSelects();
+  const tbody = document.querySelector('#staffTable tbody');
+  tbody.innerHTML = STATE.staff.map(s=>{
+    const yrs = yearsExperience(s.startDate);
+    const grp = experienceGroup(yrs);
+    const pill = (v)=> `<span class="pill ${v?'yes':'no'}">${v?'Yes':'No'}</span>`;
+    return `<tr>
+      <td>${s.name}</td>
+      <td>${s.type}</td>
+      <td>${yrs} ปี · ${grp}</td>
+      <td>${pill(s.comp.R1)}</td>
+      <td>${pill(s.comp.Open)}</td>
+      <td>${pill(s.comp.RR)}</td>
+      <td>${pill(s.inch.R1)}</td>
+      <td>${pill(s.inch.Open)}</td>
+      <td>${pill(s.inch.RR)}</td>
+      <td>${s.active?'<span class="pill yes">Active</span>':'<span class="pill no">Inactive</span>'}</td>
+      <td>
+        <button onclick="editStaff('${s.id}')">แก้ไข</button>
+        <button onclick="toggleActive('${s.id}')">${s.active?'ปิดใช้งาน':'เปิดใช้งาน'}</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  const {y,m} = parseMonthKey(currentMonthKey);
+  document.getElementById('inchargeMonthLabel').textContent = `${thaiMonthName(m)} ${beYear(y)}`;
+  const md = ensureMonth(currentMonthKey);
+  document.getElementById('inchargeSetR1').value = md.incharge.R1 || '';
+  document.getElementById('inchargeSetOpen').value = md.incharge.Open || '';
+  document.getElementById('inchargeSetRR').value = md.incharge.RR || '';
+}
+document.getElementById('btnSaveIncharge').addEventListener('click', async ()=>{
+  const md = ensureMonth(currentMonthKey);
+  md.incharge.R1 = document.getElementById('inchargeSetR1').value || null;
+  md.incharge.Open = document.getElementById('inchargeSetOpen').value || null;
+  md.incharge.RR = document.getElementById('inchargeSetRR').value || null;
+  await saveAll(true);
+  renderAll();
+});
+
+/* ===================== PAIRS TAB ===================== */
+function renderPairsTab(){
+  fillStaffSelects();
+  const list = document.getElementById('pairList');
+  list.innerHTML = STATE.pairs.map((p,i)=>{
+    const a=staffById(p.a), b=staffById(p.b);
+    if(!a||!b) return '';
+    return `<li><span>${a.name} ↔ ${b.name}</span><button onclick="removePair(${i})">ลบ</button></li>`;
+  }).join('');
+}
+document.getElementById('btnAddPair').addEventListener('click', async ()=>{
+  const a = document.getElementById('pairA').value;
+  const b = document.getElementById('pairB').value;
+  if(!a || !b || a===b){ toast('เลือกเจ้าหน้าที่สองคนที่ไม่ซ้ำกัน'); return; }
+  STATE.pairs.push({a,b});
+  await saveAll(true);
+  renderPairsTab();
+});
+async function removePair(i){
+  STATE.pairs.splice(i,1);
+  await saveAll(true);
+  renderPairsTab();
+}
+
+/* ===================== WIZARD: RANGE HELPERS ===================== */
+function dateRange(fromStr, toStr){
+  const out=[];
+  let d = new Date(fromStr+'T00:00:00');
+  const end = new Date((toStr||fromStr)+'T00:00:00');
+  while(d<=end){
+    out.push(d.toISOString().slice(0,10));
+    d.setDate(d.getDate()+1);
+  }
+  return out;
+}
+function dsInCurrentMonth(ds){
+  const {y,m} = parseMonthKey(currentMonthKey);
+  const d = new Date(ds+'T00:00:00');
+  return d.getFullYear()===y && d.getMonth()===m;
+}
+
+function addLockEntries(kind, staffId, from, to){
+  if(!staffId || !from){ toast('กรุณาเลือกเจ้าหน้าที่และวันที่'); return false; }
+  const md = ensureMonth(currentMonthKey);
+  const dates = dateRange(from, to||from).filter(dsInCurrentMonth);
+  if(dates.length===0){ toast('วันที่ที่เลือกไม่อยู่ในเดือนที่กำลังดู'); return false; }
+  dates.forEach(ds=> setStatus(md, staffId, ds, kind));
+  return true;
+}
+
+function listLockEntries(kind){
+  const md = ensureMonth(currentMonthKey);
+  const items = []; // {staffId, dates:[]}
+  const byStaff = {};
+  Object.keys(md.status).forEach(sid=>{
+    Object.keys(md.status[sid]).forEach(ds=>{
+      if(md.status[sid][ds]===kind){
+        (byStaff[sid]=byStaff[sid]||[]).push(ds);
+      }
+    });
+  });
+  Object.keys(byStaff).forEach(sid=>{
+    const dates = byStaff[sid].sort();
+    items.push({staffId:sid, dates});
+  });
+  return items;
+}
+async function removeLockEntry(kind, staffId, ds){
+  const md = ensureMonth(currentMonthKey);
+  setStatus(md, staffId, ds, null);
+  await saveAll(false);
+  renderWizard();
+}
+
+function renderLockList(kind, ulId){
+  const ul = document.getElementById(ulId);
+  const items = listLockEntries(kind);
+  if(items.length===0){ ul.innerHTML = '<li class="muted" style="background:none;">ยังไม่มีข้อมูล</li>'; return; }
+  ul.innerHTML = items.map(it=>{
+    const s = staffById(it.staffId);
+    const label = it.dates.map(ds=>ds.slice(8,10)).join(', ');
+    return `<li><span>${s?s.name:'?'} — วันที่ ${label}</span>
+      <span>${it.dates.map(ds=>`<button onclick="removeLockEntry('${kind}','${it.staffId}','${ds}')">ลบ ${ds.slice(8,10)}</button>`).join(' ')}</span>
+    </li>`;
+  }).join('');
+}
+
+document.getElementById('btnAddVac').addEventListener('click', async ()=>{
+  const ok = addLockEntries('vac', document.getElementById('vacStaff').value, document.getElementById('vacFrom').value, document.getElementById('vacTo').value);
+  if(ok){ await saveAll(false); renderWizard(); }
+});
+document.getElementById('btnAddOff').addEventListener('click', async ()=>{
+  const ok = addLockEntries('X', document.getElementById('offStaff').value, document.getElementById('offFrom').value, document.getElementById('offTo').value);
+  if(ok){ await saveAll(false); renderWizard(); }
+});
+document.getElementById('btnAddTrain').addEventListener('click', async ()=>{
+  const ok = addLockEntries('อบรม', document.getElementById('trainStaff').value, document.getElementById('trainFrom').value, document.getElementById('trainTo').value);
+  if(ok){ await saveAll(false); renderWizard(); }
+});
+document.getElementById('btnAddOd').addEventListener('click', async ()=>{
+  const ok = addLockEntries('OD', document.getElementById('odStaff').value, document.getElementById('odFrom').value, document.getElementById('odTo').value);
+  if(ok){ await saveAll(false); renderWizard(); }
+});
+
+document.getElementById('btnConfirmVac').addEventListener('click', async ()=>{
+  const md = ensureMonth(currentMonthKey);
+  md.workflow.vacationConfirmed = true;
+  await saveAll(true); renderWizard();
+});
+document.getElementById('btnConfirmOff').addEventListener('click', async ()=>{
+  const md = ensureMonth(currentMonthKey);
+  md.workflow.offConfirmed = true;
+  await saveAll(true); renderWizard();
+});
+document.getElementById('btnConfirmTrain').addEventListener('click', async ()=>{
+  const md = ensureMonth(currentMonthKey);
+  md.workflow.trainingConfirmed = true;
+  await saveAll(true); renderWizard();
+});
+
+/* ===================== WIZARD RENDER ===================== */
+function renderWizard(){
+  fillStaffSelects();
+  const md = ensureMonth(currentMonthKey);
+  const wf = md.workflow;
+  const steps = [
+    {n:1, label:'🌴 Vacation', done: wf.vacationConfirmed, locked:false},
+    {n:2, label:'❌ Requested Off', done: wf.offConfirmed, locked: !wf.vacationConfirmed},
+    {n:3, label:'📚 Training', done: wf.trainingConfirmed, locked: !wf.offConfirmed},
+    {n:4, label:'👥 Available Staff', done: wf.trainingConfirmed, locked: !wf.trainingConfirmed},
+    {n:5, label:'👑 Check Incharge', done: wf.trainingConfirmed, locked: !wf.trainingConfirmed},
+    {n:6, label:'✨ Auto Assign', done: !!md.autoAssignedAt, locked: !wf.trainingConfirmed},
+  ];
+  document.getElementById('stepsBar').innerHTML = steps.map(s=>{
+    let cls='step-chip';
+    if(s.locked) cls+=' locked'; else if(s.done) cls+=' done'; else cls+=' active';
+    return `<div class="${cls}">${s.label}</div>`;
+  }).join('');
+
+  document.getElementById('stepPanel-2').style.opacity = wf.vacationConfirmed?1:.4;
+  document.getElementById('stepPanel-2').style.pointerEvents = wf.vacationConfirmed?'auto':'none';
+  document.getElementById('stepPanel-3').style.opacity = wf.offConfirmed?1:.4;
+  document.getElementById('stepPanel-3').style.pointerEvents = wf.offConfirmed?'auto':'none';
+  document.getElementById('btnConfirmVac').disabled = wf.vacationConfirmed;
+  document.getElementById('btnConfirmOff').disabled = wf.offConfirmed || !wf.vacationConfirmed;
+  document.getElementById('btnConfirmTrain').disabled = wf.trainingConfirmed || !wf.offConfirmed;
+
+  renderLockList('vac','vacList');
+  renderLockList('X','offList');
+  renderLockList('อบรม','trainList');
+  renderLockList('OD','odList');
+
+  renderAvailability();
+  renderInchargeCheck();
+
+  document.getElementById('btnAutoAssign').disabled = !(wf.vacationConfirmed && wf.offConfirmed && wf.trainingConfirmed);
+}
+
+function computeDayAvailability(md, y, m, d){
+  const ds = dstr(y,m,d);
+  const rn = activeStaff().filter(s=>s.type==='RN');
+  const pn = activeStaff().filter(s=>s.type==='PN');
+  const lockedRN = rn.filter(s=>getStatus(md,s.id,ds));
+  const lockedPN = pn.filter(s=>getStatus(md,s.id,ds));
+  return {
+    ds,
+    totalRN: rn.length, availRN: rn.length-lockedRN.length,
+    totalPN: pn.length, availPN: pn.length-lockedPN.length,
+    lockedRNCount: lockedRN.length, lockedPNCount: lockedPN.length
+  };
+}
+const MIN_RN = 2+2+3; // R1 2 + Open 2 + RR 3
+const MIN_PN = 1+1;   // R1 1 + Open 1
+
+function renderAvailability(){
+  const md = ensureMonth(currentMonthKey);
+  const {y,m} = parseMonthKey(currentMonthKey);
+  const wds = workingDays(y,m);
+  const grid = document.getElementById('availGrid');
+  grid.innerHTML = wds.map(d=>{
+    const a = computeDayAvailability(md,y,m,d);
+    const rnOk = a.availRN>=MIN_RN, pnOk = a.availPN>=MIN_PN;
+    const ok = rnOk && pnOk;
+    let statusHtml;
+    if(ok) statusHtml = `<div class="status-ok">🟢 กำลังคนครบ</div>`;
+    else {
+      const msgs=[];
+      if(!rnOk) msgs.push(`RN ขาด ${MIN_RN-a.availRN} คน`);
+      if(!pnOk) msgs.push(`PN ขาด ${MIN_PN-a.availPN} คน`);
+      statusHtml = `<div class="status-bad">🔴 ${msgs.join(' / ')}</div>`;
+    }
+    return `<div class="avail-day">
+      <div class="d">${d} ${thaiMonthName(m).slice(0,3)}</div>
+      <div class="muted">RN: ${a.availRN}/${a.totalRN} ใช้ได้</div>
+      <div class="muted">PN: ${a.availPN}/${a.totalPN} ใช้ได้</div>
+      ${statusHtml}
+    </div>`;
+  }).join('');
+}
+
+function renderInchargeCheck(){
+  const md = ensureMonth(currentMonthKey);
+  const {y,m} = parseMonthKey(currentMonthKey);
+  const wds = workingDays(y,m);
+  let html = '';
+  AREAS.forEach(area=>{
+    const inc = staffById(md.incharge[area]);
+    if(!inc){ html += `<p class="muted">${AREA_LABEL[area]}: ยังไม่ได้กำหนด Incharge ประจำเดือน</p>`; return; }
+    const badDays = wds.filter(d=> getStatus(md, inc.id, dstr(y,m,d)));
+    html += `<div style="margin-bottom:10px;">
+      <strong>${AREA_LABEL[area]}</strong> — ${inc.name} 👑
+      ${badDays.length? `<div class="muted">ไม่พร้อมปฏิบัติงานวันที่: ${badDays.map(d=>d+' ('+getStatus(md,inc.id,dstr(y,m,d))+')').join(', ')} — ระบบจะหา Acting Incharge ให้อัตโนมัติเมื่อ Auto Assign</div>`
+        : `<div class="muted status-ok">พร้อมปฏิบัติงานทุกวันทำการ</div>`}
+    </div>`;
+  });
+  document.getElementById('inchargeCheck').innerHTML = html;
+}
+
+/* ===================== AUTO ASSIGN ALGORITHM ===================== */
+function pairConflictExists(md, ds, area, candidateId, usedToday){
+  for(const p of STATE.pairs){
+    let other=null;
+    if(p.a===candidateId) other=p.b;
+    else if(p.b===candidateId) other=p.a;
+    if(other && usedToday.has(other)){
+      const oa = getAssign(md, other, ds);
+      if(oa && oa.area===area) return true;
+    }
+  }
+  return false;
+}
+
+function autoAssignMonth(mk){
+  const md = ensureMonth(mk);
+  const {y,m} = parseMonthKey(mk);
+  const wds = workingDays(y,m);
+  md.assign = {};
+  const conflicts = [];
+  const actingCount = {}; STATE.staff.forEach(s=>actingCount[s.id]=0);
+  const areaCount = {R1:{}, Open:{}, RR:{}};
+  STATE.staff.forEach(s=>{ areaCount.R1[s.id]=0; areaCount.Open[s.id]=0; areaCount.RR[s.id]=0; });
+
+  wds.forEach(d=>{
+    const ds = dstr(y,m,d);
+    const usedToday = new Set();
+    const isLocked = (sid)=> !!getStatus(md, sid, ds);
+    const rnAll = activeStaff().filter(s=>s.type==='RN');
+    const pnAll = activeStaff().filter(s=>s.type==='PN');
+
+    function assignIncharge(area){
+      const fixedId = md.incharge[area];
+      const fixed = fixedId ? staffById(fixedId) : null;
+      if(fixed && fixed.active && !isLocked(fixed.id)){
+        setAssign(md, fixed.id, ds, area, false);
+        usedToday.add(fixed.id);
+        areaCount[area][fixed.id]++;
+        return;
+      }
+      // Need acting incharge
+      let candidates = [];
+      let usedRoom4 = false;
+      if(ROOM4.includes(area)){
+        candidates = rnAll.filter(s=> !isLocked(s.id) && !usedToday.has(s.id)
+          && s.comp[area] && s.inch[area]
+          && (s.comp.R1 || s.comp.Open) // ห้อง4 member
+          && !pairConflictExists(md, ds, area, s.id, usedToday));
+        usedRoom4 = true;
+      } else {
+        candidates = rnAll.filter(s=> !isLocked(s.id) && !usedToday.has(s.id)
+          && s.comp.RR && s.inch.RR
+          && !pairConflictExists(md, ds, area, s.id, usedToday));
+      }
+      if(candidates.length===0 && ROOM4.includes(area)){
+        // last resort: look at RR-based candidates, but flag for manual decision, do not auto-move
+        const rrCandidates = rnAll.filter(s=> !isLocked(s.id) && !usedToday.has(s.id)
+          && s.comp[area] && s.inch[area] && s.comp.RR && !(s.comp.R1||s.comp.Open&&false));
+        // actually candidates whose primary base is RR: comp.RR true and not counted above (already excluded since above required comp.R1||comp.Open)
+        const rrOnly = rnAll.filter(s=> !isLocked(s.id) && !usedToday.has(s.id) && s.inch[area] && s.comp.RR);
+        if(rrOnly.length>0){
+          conflicts.push({level:'warn', date:ds,
+            msg:`${d} — ไม่พบ Acting ${AREA_LABEL[area]} Incharge จากห้อง 4; พบผู้มี competency ใน RR: ${rrOnly.map(c=>c.name).join(', ')} แต่การย้ายอาจทำให้ RR ต่ำกว่ามาตรฐาน ต้องการการตัดสินใจจากผู้จัดตาราง`});
+        } else {
+          conflicts.push({level:'error', date:ds, msg:`${d} — ไม่พบ Acting ${AREA_LABEL[area]} Incharge ที่มีคุณสมบัติ`});
+        }
+        return;
+      }
+      if(candidates.length===0){
+        // RR incharge absence - try any RN with RR comp+inch already covered above; if truly none, try pulling from ห้อง4
+        if(area==='RR'){
+          const room4Pull = rnAll.filter(s=> !isLocked(s.id) && !usedToday.has(s.id) && s.inch.RR
+            && !pairConflictExists(md, ds, area, s.id, usedToday));
+          if(room4Pull.length>0){
+            room4Pull.sort((a,b)=> actingCount[a.id]-actingCount[b.id]);
+            const chosen = room4Pull[0];
+            setAssign(md, chosen.id, ds, area, true);
+            usedToday.add(chosen.id); actingCount[chosen.id]++; areaCount[area][chosen.id]++;
+            conflicts.push({level:'warn', date:ds, msg:`${d} — ดึงเจ้าหน้าที่จากห้อง 4 (${chosen.name}) มาเป็น Acting RR Incharge เนื่องจากไม่มีผู้เหมาะสมใน RR`});
+            return;
+          }
+        }
+        conflicts.push({level:'error', date:ds, msg:`${d} — ไม่พบ Acting ${AREA_LABEL[area]} Incharge ที่มีคุณสมบัติ`});
+        return;
+      }
+      candidates.sort((a,b)=> (actingCount[a.id]-actingCount[b.id]) || ((areaCount.R1[a.id]+areaCount.Open[a.id]+areaCount.RR[a.id])-(areaCount.R1[b.id]+areaCount.Open[b.id]+areaCount.RR[b.id])));
+      const chosen = candidates[0];
+      setAssign(md, chosen.id, ds, area, true);
+      usedToday.add(chosen.id);
+      actingCount[chosen.id]++;
+      areaCount[area][chosen.id]++;
+    }
+
+    AREAS.forEach(assignIncharge);
+
+    function fillArea(area, needRN, needPN, targetRN){
+      let haveRN = STATE.staff.filter(s=>{const a=getAssign(md,s.id,ds); return a&&a.area===area&&s.type==='RN';}).length;
+      let havePN = STATE.staff.filter(s=>{const a=getAssign(md,s.id,ds); return a&&a.area===area&&s.type==='PN';}).length;
+      let rnPool = rnAll.filter(s=> !isLocked(s.id) && !usedToday.has(s.id) && s.comp[area]);
+      rnPool.sort((a,b)=> areaCount[area][a.id]-areaCount[area][b.id]);
+      while(haveRN<needRN && rnPool.length){
+        const idx = rnPool.findIndex(s=> !pairConflictExists(md, ds, area, s.id, usedToday));
+        if(idx<0) break;
+        const cand = rnPool[idx];
+        setAssign(md, cand.id, ds, area, false);
+        usedToday.add(cand.id); areaCount[area][cand.id]++; haveRN++;
+        rnPool.splice(idx,1);
+      }
+      if(area!=='RR'){
+        let pnPool = pnAll.filter(s=> !isLocked(s.id) && !usedToday.has(s.id) && s.comp[area]);
+        pnPool.sort((a,b)=> areaCount[area][a.id]-areaCount[area][b.id]);
+        while(havePN<needPN && pnPool.length){
+          const idx = pnPool.findIndex(s=> !pairConflictExists(md, ds, area, s.id, usedToday));
+          if(idx<0) break;
+          const cand = pnPool[idx];
+          setAssign(md, cand.id, ds, area, false);
+          usedToday.add(cand.id); areaCount[area][cand.id]++; havePN++;
+          pnPool.splice(idx,1);
+        }
+      }
+      if(haveRN<needRN) conflicts.push({level:'error', date:ds, msg:`${d} — RN ${AREA_LABEL[area]} เหลือ ${haveRN} / ต้องการขั้นต่ำ ${needRN}`});
+      if(area!=='RR' && havePN<needPN) conflicts.push({level:'error', date:ds, msg:`${d} — PN ${AREA_LABEL[area]} เหลือ ${havePN} / ต้องการขั้นต่ำ ${needPN}`});
+      // soft: top up RN toward targetRN
+      if(targetRN){
+        let rnPool2 = rnAll.filter(s=> !isLocked(s.id) && !usedToday.has(s.id) && s.comp[area]);
+        rnPool2.sort((a,b)=> areaCount[area][a.id]-areaCount[area][b.id]);
+        while(haveRN<targetRN && rnPool2.length){
+          const idx = rnPool2.findIndex(s=> !pairConflictExists(md, ds, area, s.id, usedToday));
+          if(idx<0) break;
+          const cand = rnPool2[idx];
+          setAssign(md, cand.id, ds, area, false);
+          usedToday.add(cand.id); areaCount[area][cand.id]++; haveRN++;
+          rnPool2.splice(idx,1);
+        }
+      }
+    }
+    fillArea('R1',2,1,3);
+    fillArea('Open',2,1,3);
+    fillArea('RR',3,0,null);
+
+    // check pair restriction hard failure detection (if two paired both ended up same area - shouldn't happen given checks)
+  });
+
+  md.actingLog = actingCount;
+  md.conflicts = conflicts;
+  md.autoAssignedAt = new Date().toISOString();
+  return conflicts;
+}
+
+document.getElementById('btnAutoAssign').addEventListener('click', async ()=>{
+  const conflicts = autoAssignMonth(currentMonthKey);
+  await saveAll(false);
+  const errs = conflicts.filter(c=>c.level==='error').length;
+  const warns = conflicts.filter(c=>c.level==='warn').length;
+  document.getElementById('autoAssignResult').innerHTML =
+    `<p class="${errs?'status-bad':'status-ok'}">${errs? '🔴 พบข้อขัดแย้ง '+errs+' รายการ' : '🟢 จัดตารางสำเร็จไม่มีข้อขัดแย้งร้ายแรง'}${warns? ' · ⚠️ '+warns+' คำเตือน':''}</p>
+     <p class="muted">ดูรายละเอียดที่แท็บ "ข้อขัดแย้ง" หรือดูผลลัพธ์ที่แท็บ "ตารางประจำเดือน"</p>`;
+  toast('Auto Assign เสร็จสิ้น');
+  renderWizard();
+  renderDashboard();
+  renderConflicts();
+});
+document.getElementById('btnAutoAssignTop').addEventListener('click', ()=> document.getElementById('btnAutoAssign').click());
+
+/* ===================== DASHBOARD / SCHEDULE TABLE ===================== */
+function cellInfo(md, staffId, ds){
+  const st = getStatus(md, staffId, ds);
+  if(st==='vac') return {cls:'cell-vac', text:'vac'};
+  if(st==='X') return {cls:'cell-X', text:'X'};
+  if(st==='อบรม') return {cls:'cell-train', text:'อบรม'};
+  if(st==='OD') return {cls:'cell-od', text:'OD'};
+  const a = getAssign(md, staffId, ds);
+  if(a){
+    if(a.area==='Open') return {cls:'cell-Open', text: a.acting? '<span class="acting-star">*</span>':''};
+    const star = a.acting? '<span class="acting-star">*</span>':'';
+    return {cls:'cell-'+a.area, text:a.area+star};
+  }
+  return {cls:'cell-unassigned', text:'—'};
+}
+
+function renderInchargeBox(){
+  const md = ensureMonth(currentMonthKey);
+  const {y,m} = parseMonthKey(currentMonthKey);
+  document.getElementById('dashTitle').textContent = `ตารางมอบหมายประจำเดือน ${thaiMonthName(m)} ${beYear(y)}`;
+  document.getElementById('inchargeBox').innerHTML = AREAS.map(area=>{
+    const s = staffById(md.incharge[area]);
+    return `<div class="incharge-card">
+      <div class="area">${AREA_LABEL[area]}</div>
+      <div class="name">${s? s.name : '— ยังไม่กำหนด'} ${s?'<span class="crown">👑</span>':''}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderScheduleTable(){
+  const md = ensureMonth(currentMonthKey);
+  const {y,m} = parseMonthKey(currentMonthKey);
+  const wds = workingDays(y,m);
+  const table = document.getElementById('scheduleTable');
+  let thead = '<thead><tr><th>เจ้าหน้าที่</th>' + wds.map(d=>{
+    const wd = new Date(y,m,d).getDay();
+    return `<th class="${wd===0||wd===6?'wk':''}">${d}<br><span style="font-weight:400;">${WEEKDAY_TH[wd]}</span></th>`;
+  }).join('') + '</tr></thead>';
+
+  const staffSorted = [...activeStaff()].sort((a,b)=>{
+    const aInc = AREAS.some(ar=>md.incharge[ar]===a.id), bInc = AREAS.some(ar=>md.incharge[ar]===b.id);
+    if(aInc!==bInc) return aInc? -1:1;
+    if(a.type!==b.type) return a.type==='RN'?-1:1;
+    return a.name.localeCompare(b.name);
+  });
+
+  let tbody = '<tbody>' + staffSorted.map(s=>{
+    const isInc = AREAS.find(ar=>md.incharge[ar]===s.id);
+    const nameHtml = s.name + (isInc? ' <span class="crown">👑</span>':'');
+    const cells = wds.map(d=>{
+      const ds = dstr(y,m,d);
+      const info = cellInfo(md, s.id, ds);
+      return `<td class="${info.cls}" onclick="openCellEditor('${s.id}','${ds}')">${info.text}</td>`;
+    }).join('');
+    return `<tr><th>${nameHtml}</th>${cells}</tr>`;
+  }).join('') + '</tbody>';
+
+  table.innerHTML = thead + tbody;
+}
+
+function renderDashboard(){
+  renderInchargeBox();
+  renderScheduleTable();
+}
+
+/* ===================== MANUAL CELL EDITOR ===================== */
+function openCellEditor(staffId, ds){
+  const s = staffById(staffId);
+  const md = ensureMonth(currentMonthKey);
+  const root = document.getElementById('modalRoot');
+  const opts = ['R1','Open','RR','X','vac','อบรม','OD','—'];
+  root.innerHTML = `<div class="modal-backdrop" onclick="if(event.target===this) closeModal();">
+    <div class="modal">
+      <h3>${s.name} — ${ds}</h3>
+      <div class="opts">${opts.map(o=>`<button onclick="applyCellEdit('${staffId}','${ds}','${o}')">${o}</button>`).join('')}</div>
+      <div class="muted" id="cellEditMsg"></div>
+      <div style="text-align:right; margin-top:10px;"><button onclick="closeModal()">ปิด</button></div>
+    </div>
+  </div>`;
+}
+function closeModal(){ document.getElementById('modalRoot').innerHTML=''; }
+async function applyCellEdit(staffId, ds, val){
+  const s = staffById(staffId);
+  const md = ensureMonth(currentMonthKey);
+  if(val==='RR' && s.type==='PN'){
+    document.getElementById('cellEditMsg').textContent = 'ไม่สามารถจัด PN เข้า RR ได้';
+    return;
+  }
+  // pair check for area assignment
+  if(['R1','Open','RR'].includes(val)){
+    const usedToday = new Set(STATE.staff.filter(x=>{const a=getAssign(md,x.id,ds); return a && x.id!==staffId;}).map(x=>x.id));
+    if(pairConflictExists(md, ds, val, staffId, usedToday)){
+      document.getElementById('cellEditMsg').textContent = 'มีข้อจำกัดคู่: บุคคลนี้ถูกกำหนดไม่ให้อยู่ Area เดียวกันกับคู่ที่จำกัดไว้ในวันนี้';
+      return;
+    }
+  }
+  if(LOCK_TYPES.includes(val)){
+    setStatus(md, staffId, ds, val);
+    setAssign(md, staffId, ds, null);
+  } else if(val==='—'){
+    setStatus(md, staffId, ds, null);
+    setAssign(md, staffId, ds, null);
+  } else {
+    setStatus(md, staffId, ds, null);
+    setAssign(md, staffId, ds, val, false);
+  }
+  await saveAll(false);
+  closeModal();
+  renderDashboard();
+  toast('อัปเดตแล้ว');
+}
+
+document.getElementById('btnConfirmSchedule').addEventListener('click', async ()=>{
+  const md = ensureMonth(currentMonthKey);
+  md.workflow.scheduleConfirmed = true;
+  await saveAll(true);
+  toast('ยืนยันตารางเดือนนี้แล้ว');
+});
+
+/* ===================== CONFLICTS TAB ===================== */
+function renderConflicts(){
+  const md = ensureMonth(currentMonthKey);
+  const list = document.getElementById('conflictList');
+  const conflicts = md.conflicts || [];
+  if(conflicts.length===0){
+    list.innerHTML = '<p class="muted">ยังไม่มีข้อขัดแย้ง — ลองรัน Auto Assign ก่อน</p>';
+    return;
+  }
+  list.innerHTML = conflicts.map(c=>{
+    const icon = c.level==='error'? '🔴' : '🟠';
+    return `<div class="conflict-item ${c.level}" onclick="jumpToDate('${c.date}')">${icon} ${c.msg}</div>`;
+  }).join('');
+}
+function jumpToDate(ds){
+  document.querySelector('nav.tabs button[data-tab="dashboard"]').click();
+  toast('วันที่ '+ds);
+}
+
+/* ===================== REPORT TAB ===================== */
+function renderReport(){
+  const md = ensureMonth(currentMonthKey);
+  const {y,m} = parseMonthKey(currentMonthKey);
+  const wds = workingDays(y,m);
+  const rows = activeStaff().map(s=>{
+    let R1=0,Open=0,RR=0,X=0,vac=0,train=0,acting=0;
+    wds.forEach(d=>{
+      const ds = dstr(y,m,d);
+      const st = getStatus(md,s.id,ds);
+      if(st==='X') X++;
+      if(st==='vac') vac++;
+      if(st==='อบรม') train++;
+      const a = getAssign(md,s.id,ds);
+      if(a){
+        if(a.area==='R1') R1++;
+        if(a.area==='Open') Open++;
+        if(a.area==='RR') RR++;
+        if(a.acting) acting++;
+      }
+    });
+    const total = R1+Open+RR;
+    const isFixed = AREAS.some(ar=>md.incharge[ar]===s.id);
+    return {s, R1, Open, RR, X, vac, train, acting, total, isFixed};
+  });
+  const rotating = rows.filter(r=>!r.isFixed);
+  const avg = rotating.length ? rotating.reduce((a,r)=>a+r.total,0)/rotating.length : 0;
+  const tbody = document.querySelector('#reportTable tbody');
+  tbody.innerHTML = rows.map(r=>{
+    const diff = r.isFixed ? '<span class="muted">Fixed Incharge</span>' : (r.total-avg).toFixed(1);
+    return `<tr>
+      <td>${r.s.name}${r.isFixed?' 👑':''}</td>
+      <td>${r.s.type}</td>
+      <td>${r.R1}</td><td>${r.Open}</td><td>${r.RR}</td>
+      <td>${r.X}</td><td>${r.vac}</td><td>${r.train}</td>
+      <td>${r.acting}</td><td>${r.total}</td><td>${diff}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ===================== HEADER ACTIONS ===================== */
+document.getElementById('btnSaveDraft').addEventListener('click', ()=> saveAll(true));
+document.getElementById('btnExport').addEventListener('click', exportBackup);
+document.getElementById('btnImport').addEventListener('click', ()=> document.getElementById('importFile').click());
+document.getElementById('importFile').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(file) await importBackupFile(file);
+  e.target.value = '';
+});
+document.getElementById('btnResetDemo').addEventListener('click', async ()=>{
+  if(!confirm('ต้องการรีเซ็ตข้อมูลทั้งหมดเป็นข้อมูลตัวอย่างหรือไม่? ข้อมูลปัจจุบันจะหายไป')) return;
+  await buildDemoData();
+  currentMonthKey = null;
+  populateMonthSelect();
+  renderAll();
+  toast('รีเซ็ตข้อมูลตัวอย่างแล้ว');
+});
+document.getElementById('btnPrint').addEventListener('click', ()=>{
+  document.querySelector('nav.tabs button[data-tab="dashboard"]').click();
+  setTimeout(()=>window.print(), 100);
+});
+
+/* ===================== INIT ===================== */
+function renderAll(){
+  populateMonthSelect();
+  renderDashboard();
+  renderStaffTab();
+  renderPairsTab();
+  renderWizard();
+  renderConflicts();
+  renderReport();
+}
+
+(async function init(){
+  const note = document.getElementById('storageNote');
+  note.textContent = hasClaudeStorage
+    ? 'บันทึกข้อมูลผ่าน Claude storage (ใช้ได้เฉพาะในแชทนี้/บัญชีนี้)'
+    : 'บันทึกข้อมูลไว้ในเบราว์เซอร์นี้เท่านั้น (localStorage) — กด "ดาวน์โหลดแบ็คอัพ" เป็นระยะเพื่อกันข้อมูลหาย และใช้ "นำเข้าแบ็คอัพ" เมื่อเปลี่ยนเครื่อง/เบราว์เซอร์';
+  await loadAll();
+  populateMonthSelect();
+  renderAll();
+})();
+</script>
+</body>
+</html>
