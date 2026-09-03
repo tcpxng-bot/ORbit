@@ -568,6 +568,29 @@ function workingDays(y,m){
   for(let d=1; d<=n; d++){ if(!isWeekend(y,m,d)) out.push(d); }
   return out;
 }
+function mondayKeyOf(y,m,d){
+  const dt = new Date(y,m,d);
+  const wd = dt.getDay(); // 0=Sun..6=Sat
+  const diff = (wd===0? -6 : 1-wd);
+  dt.setDate(dt.getDate()+diff);
+  return `${dt.getFullYear()}-${pad2(dt.getMonth()+1)}-${pad2(dt.getDate())}`;
+}
+// Groups this month's working days (Mon-Fri) into calendar weeks.
+// Each staff keeps the SAME area assignment across all days within a week block.
+function getWeeksOfMonth(y,m){
+  const wds = workingDays(y,m);
+  const groups = {};
+  wds.forEach(d=>{
+    const key = mondayKeyOf(y,m,d);
+    (groups[key]=groups[key]||[]).push(d);
+  });
+  return Object.keys(groups).sort().map(k=>({weekStart:k, days:groups[k]}));
+}
+// Given one date-in-month (day number), return all working days in the same week block.
+function weekDaysContaining(y,m,d){
+  const key = mondayKeyOf(y,m,d);
+  return workingDays(y,m).filter(dd=> mondayKeyOf(y,m,dd)===key);
+}
 function beYear(y){ return y+543; }
 function thaiMonthName(m){
   return ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'][m];
@@ -1072,7 +1095,14 @@ function renderInchargeCheck(){
   document.getElementById('inchargeCheck').innerHTML = html;
 }
 
-/* ===================== AUTO ASSIGN ALGORITHM ===================== */
+/* ===================== AUTO ASSIGN ALGORITHM (WEEKLY BLOCKS) =====================
+   Staff keep the SAME area (R1 / Open / RR) for every working day within one
+   calendar week. Day-level locks (vac/X/อบรม/OD) still apply per day — if someone
+   is locked on just part of their week, only those specific days show the lock;
+   the rest of the week they stay in their assigned room. If a fixed monthly
+   Incharge is locked on only some days of the week, the room-team is unchanged —
+   only the Incharge role for those specific days is covered by an Acting Incharge
+   drawn first from that week's own ห้อง 4 team. */
 function pairConflictExists(md, ds, area, candidateId, usedToday){
   for(const p of STATE.pairs){
     let other=null;
@@ -1085,134 +1115,182 @@ function pairConflictExists(md, ds, area, candidateId, usedToday){
   }
   return false;
 }
+// Weekly-level pair check: would assigning candidate to `area` for the whole week
+// put them in the same area as a restricted partner on any day they're both present?
+function weeklyPairConflict(md, weekDs, area, candidateId, weekRoomOf){
+  for(const p of STATE.pairs){
+    let other=null;
+    if(p.a===candidateId) other=p.b;
+    else if(p.b===candidateId) other=p.a;
+    if(other && weekRoomOf[other]===area) return true;
+  }
+  return false;
+}
 
 function autoAssignMonth(mk){
   const md = ensureMonth(mk);
   const {y,m} = parseMonthKey(mk);
-  const wds = workingDays(y,m);
+  const weeks = getWeeksOfMonth(y,m);
   md.assign = {};
   const conflicts = [];
   const actingCount = {}; STATE.staff.forEach(s=>actingCount[s.id]=0);
   const areaCount = {R1:{}, Open:{}, RR:{}};
   STATE.staff.forEach(s=>{ areaCount.R1[s.id]=0; areaCount.Open[s.id]=0; areaCount.RR[s.id]=0; });
 
-  wds.forEach(d=>{
-    const ds = dstr(y,m,d);
-    const usedToday = new Set();
-    const isLocked = (sid)=> !!getStatus(md, sid, ds);
+  weeks.forEach(week=>{
+    const days = week.days; // array of day numbers in this week block
+    const dsList = days.map(d=>dstr(y,m,d));
     const rnAll = activeStaff().filter(s=>s.type==='RN');
     const pnAll = activeStaff().filter(s=>s.type==='PN');
+    const isLockedOn = (sid, ds)=> !!getStatus(md, sid, ds);
+    // "fully locked" = locked (or inactive) every working day of this week -> cannot hold a room this week at all
+    const fullyLockedWeek = (sid)=> dsList.every(ds=>isLockedOn(sid, ds));
+    const availableAnyDay = (sid)=> !fullyLockedWeek(sid);
 
-    function assignIncharge(area){
+    const weekRoomOf = {};      // staffId -> area, for this week's block
+    const weekIsActing = {};    // staffId -> true if they are the Acting (not fixed) weekly incharge
+
+    function assignWeeklyIncharge(area){
       const fixedId = md.incharge[area];
       const fixed = fixedId ? staffById(fixedId) : null;
-      if(fixed && fixed.active && !isLocked(fixed.id)){
-        setAssign(md, fixed.id, ds, area, false);
-        usedToday.add(fixed.id);
-        areaCount[area][fixed.id]++;
+      if(fixed && fixed.active && availableAnyDay(fixed.id)){
+        weekRoomOf[fixed.id] = area;
+        areaCount[area][fixed.id] += dsList.filter(ds=>!isLockedOn(fixed.id,ds)).length;
         return;
       }
-      // Need acting incharge
+      // Fixed incharge unavailable the ENTIRE week -> need a weekly Acting Incharge
       let candidates = [];
-      let usedRoom4 = false;
       if(ROOM4.includes(area)){
-        candidates = rnAll.filter(s=> !isLocked(s.id) && !usedToday.has(s.id)
-          && s.comp[area] && s.inch[area]
-          && (s.comp.R1 || s.comp.Open) // ห้อง4 member
-          && !pairConflictExists(md, ds, area, s.id, usedToday));
-        usedRoom4 = true;
+        candidates = rnAll.filter(s=> availableAnyDay(s.id) && !weekRoomOf[s.id]
+          && s.comp[area] && s.inch[area] && (s.comp.R1 || s.comp.Open)
+          && !weeklyPairConflict(md, dsList, area, s.id, weekRoomOf));
       } else {
-        candidates = rnAll.filter(s=> !isLocked(s.id) && !usedToday.has(s.id)
+        candidates = rnAll.filter(s=> availableAnyDay(s.id) && !weekRoomOf[s.id]
           && s.comp.RR && s.inch.RR
-          && !pairConflictExists(md, ds, area, s.id, usedToday));
+          && !weeklyPairConflict(md, dsList, area, s.id, weekRoomOf));
       }
       if(candidates.length===0 && ROOM4.includes(area)){
-        // last resort: look at RR-based candidates, but flag for manual decision, do not auto-move
-        const rrCandidates = rnAll.filter(s=> !isLocked(s.id) && !usedToday.has(s.id)
-          && s.comp[area] && s.inch[area] && s.comp.RR && !(s.comp.R1||s.comp.Open&&false));
-        // actually candidates whose primary base is RR: comp.RR true and not counted above (already excluded since above required comp.R1||comp.Open)
-        const rrOnly = rnAll.filter(s=> !isLocked(s.id) && !usedToday.has(s.id) && s.inch[area] && s.comp.RR);
+        const rrOnly = rnAll.filter(s=> availableAnyDay(s.id) && !weekRoomOf[s.id] && s.inch[area] && s.comp.RR);
+        const label = `สัปดาห์ที่เริ่ม ${days[0]} ${thaiMonthName(m)}`;
         if(rrOnly.length>0){
-          conflicts.push({level:'warn', date:ds,
-            msg:`${d} — ไม่พบ Acting ${AREA_LABEL[area]} Incharge จากห้อง 4; พบผู้มี competency ใน RR: ${rrOnly.map(c=>c.name).join(', ')} แต่การย้ายอาจทำให้ RR ต่ำกว่ามาตรฐาน ต้องการการตัดสินใจจากผู้จัดตาราง`});
+          conflicts.push({level:'warn', date:dsList[0],
+            msg:`${label} — ไม่พบ Acting ${AREA_LABEL[area]} Incharge จากห้อง 4 ทั้งสัปดาห์; พบผู้มี competency ใน RR: ${rrOnly.map(c=>c.name).join(', ')} แต่การย้ายอาจทำให้ RR ต่ำกว่ามาตรฐาน ต้องการการตัดสินใจจากผู้จัดตาราง`});
         } else {
-          conflicts.push({level:'error', date:ds, msg:`${d} — ไม่พบ Acting ${AREA_LABEL[area]} Incharge ที่มีคุณสมบัติ`});
+          conflicts.push({level:'error', date:dsList[0], msg:`${label} — ไม่พบ Acting ${AREA_LABEL[area]} Incharge ที่มีคุณสมบัติทั้งสัปดาห์`});
         }
         return;
       }
       if(candidates.length===0){
-        // RR incharge absence - try any RN with RR comp+inch already covered above; if truly none, try pulling from ห้อง4
         if(area==='RR'){
-          const room4Pull = rnAll.filter(s=> !isLocked(s.id) && !usedToday.has(s.id) && s.inch.RR
-            && !pairConflictExists(md, ds, area, s.id, usedToday));
+          const room4Pull = rnAll.filter(s=> availableAnyDay(s.id) && !weekRoomOf[s.id] && s.inch.RR
+            && !weeklyPairConflict(md, dsList, area, s.id, weekRoomOf));
           if(room4Pull.length>0){
             room4Pull.sort((a,b)=> actingCount[a.id]-actingCount[b.id]);
             const chosen = room4Pull[0];
-            setAssign(md, chosen.id, ds, area, true);
-            usedToday.add(chosen.id); actingCount[chosen.id]++; areaCount[area][chosen.id]++;
-            conflicts.push({level:'warn', date:ds, msg:`${d} — ดึงเจ้าหน้าที่จากห้อง 4 (${chosen.name}) มาเป็น Acting RR Incharge เนื่องจากไม่มีผู้เหมาะสมใน RR`});
+            weekRoomOf[chosen.id]=area; weekIsActing[chosen.id]=true;
+            actingCount[chosen.id]++; areaCount[area][chosen.id]+=dsList.filter(ds=>!isLockedOn(chosen.id,ds)).length;
+            conflicts.push({level:'warn', date:dsList[0], msg:`สัปดาห์ที่เริ่ม ${days[0]} ${thaiMonthName(m)} — ดึงเจ้าหน้าที่จากห้อง 4 (${chosen.name}) มาเป็น Acting RR Incharge ทั้งสัปดาห์ เนื่องจากไม่มีผู้เหมาะสมใน RR`});
             return;
           }
         }
-        conflicts.push({level:'error', date:ds, msg:`${d} — ไม่พบ Acting ${AREA_LABEL[area]} Incharge ที่มีคุณสมบัติ`});
+        conflicts.push({level:'error', date:dsList[0], msg:`สัปดาห์ที่เริ่ม ${days[0]} ${thaiMonthName(m)} — ไม่พบ Acting ${AREA_LABEL[area]} Incharge ที่มีคุณสมบัติทั้งสัปดาห์`});
         return;
       }
       candidates.sort((a,b)=> (actingCount[a.id]-actingCount[b.id]) || ((areaCount.R1[a.id]+areaCount.Open[a.id]+areaCount.RR[a.id])-(areaCount.R1[b.id]+areaCount.Open[b.id]+areaCount.RR[b.id])));
       const chosen = candidates[0];
-      setAssign(md, chosen.id, ds, area, true);
-      usedToday.add(chosen.id);
+      weekRoomOf[chosen.id]=area; weekIsActing[chosen.id]=true;
       actingCount[chosen.id]++;
-      areaCount[area][chosen.id]++;
+      areaCount[area][chosen.id]+=dsList.filter(ds=>!isLockedOn(chosen.id,ds)).length;
     }
+    AREAS.forEach(assignWeeklyIncharge);
 
-    AREAS.forEach(assignIncharge);
-
-    function fillArea(area, needRN, needPN, targetRN){
-      let haveRN = STATE.staff.filter(s=>{const a=getAssign(md,s.id,ds); return a&&a.area===area&&s.type==='RN';}).length;
-      let havePN = STATE.staff.filter(s=>{const a=getAssign(md,s.id,ds); return a&&a.area===area&&s.type==='PN';}).length;
-      let rnPool = rnAll.filter(s=> !isLocked(s.id) && !usedToday.has(s.id) && s.comp[area]);
+    function fillWeeklyArea(area, needRN, needPN, targetRN){
+      let haveRN = Object.keys(weekRoomOf).filter(sid=>weekRoomOf[sid]===area && staffById(sid).type==='RN').length;
+      let havePN = Object.keys(weekRoomOf).filter(sid=>weekRoomOf[sid]===area && staffById(sid).type==='PN').length;
+      let rnPool = rnAll.filter(s=> availableAnyDay(s.id) && !weekRoomOf[s.id] && s.comp[area]);
       rnPool.sort((a,b)=> areaCount[area][a.id]-areaCount[area][b.id]);
       while(haveRN<needRN && rnPool.length){
-        const idx = rnPool.findIndex(s=> !pairConflictExists(md, ds, area, s.id, usedToday));
+        const idx = rnPool.findIndex(s=> !weeklyPairConflict(md, dsList, area, s.id, weekRoomOf));
         if(idx<0) break;
         const cand = rnPool[idx];
-        setAssign(md, cand.id, ds, area, false);
-        usedToday.add(cand.id); areaCount[area][cand.id]++; haveRN++;
+        weekRoomOf[cand.id]=area; areaCount[area][cand.id]+=dsList.filter(ds=>!isLockedOn(cand.id,ds)).length; haveRN++;
         rnPool.splice(idx,1);
       }
       if(area!=='RR'){
-        let pnPool = pnAll.filter(s=> !isLocked(s.id) && !usedToday.has(s.id) && s.comp[area]);
+        let pnPool = pnAll.filter(s=> availableAnyDay(s.id) && !weekRoomOf[s.id] && s.comp[area]);
         pnPool.sort((a,b)=> areaCount[area][a.id]-areaCount[area][b.id]);
         while(havePN<needPN && pnPool.length){
-          const idx = pnPool.findIndex(s=> !pairConflictExists(md, ds, area, s.id, usedToday));
+          const idx = pnPool.findIndex(s=> !weeklyPairConflict(md, dsList, area, s.id, weekRoomOf));
           if(idx<0) break;
           const cand = pnPool[idx];
-          setAssign(md, cand.id, ds, area, false);
-          usedToday.add(cand.id); areaCount[area][cand.id]++; havePN++;
+          weekRoomOf[cand.id]=area; areaCount[area][cand.id]+=dsList.filter(ds=>!isLockedOn(cand.id,ds)).length; havePN++;
           pnPool.splice(idx,1);
         }
       }
-      if(haveRN<needRN) conflicts.push({level:'error', date:ds, msg:`${d} — RN ${AREA_LABEL[area]} เหลือ ${haveRN} / ต้องการขั้นต่ำ ${needRN}`});
-      if(area!=='RR' && havePN<needPN) conflicts.push({level:'error', date:ds, msg:`${d} — PN ${AREA_LABEL[area]} เหลือ ${havePN} / ต้องการขั้นต่ำ ${needPN}`});
-      // soft: top up RN toward targetRN
       if(targetRN){
-        let rnPool2 = rnAll.filter(s=> !isLocked(s.id) && !usedToday.has(s.id) && s.comp[area]);
+        let rnPool2 = rnAll.filter(s=> availableAnyDay(s.id) && !weekRoomOf[s.id] && s.comp[area]);
         rnPool2.sort((a,b)=> areaCount[area][a.id]-areaCount[area][b.id]);
         while(haveRN<targetRN && rnPool2.length){
-          const idx = rnPool2.findIndex(s=> !pairConflictExists(md, ds, area, s.id, usedToday));
+          const idx = rnPool2.findIndex(s=> !weeklyPairConflict(md, dsList, area, s.id, weekRoomOf));
           if(idx<0) break;
           const cand = rnPool2[idx];
-          setAssign(md, cand.id, ds, area, false);
-          usedToday.add(cand.id); areaCount[area][cand.id]++; haveRN++;
+          weekRoomOf[cand.id]=area; areaCount[area][cand.id]+=dsList.filter(ds=>!isLockedOn(cand.id,ds)).length; haveRN++;
           rnPool2.splice(idx,1);
         }
       }
     }
-    fillArea('R1',2,1,3);
-    fillArea('Open',2,1,3);
-    fillArea('RR',3,0,null);
+    fillWeeklyArea('R1',2,1,3);
+    fillWeeklyArea('Open',2,1,3);
+    fillWeeklyArea('RR',3,0,null);
 
-    // check pair restriction hard failure detection (if two paired both ended up same area - shouldn't happen given checks)
+    // ---- Write the weekly room assignment onto each actual day, respecting per-day locks ----
+    Object.keys(weekRoomOf).forEach(sid=>{
+      const area = weekRoomOf[sid];
+      dsList.forEach(ds=>{
+        if(!isLockedOn(sid, ds)){
+          setAssign(md, sid, ds, area, !!weekIsActing[sid]);
+        }
+        // else: locked day keeps its status (vac/X/อบรม/OD); person resumes same room on their next unlocked day this week automatically since weekRoomOf persists
+      });
+    });
+
+    // ---- Day-level gap check: does each area have its fixed/weekly Incharge present today? ----
+    dsList.forEach((ds,dayIdx)=>{
+      const d = days[dayIdx];
+      AREAS.forEach(area=>{
+        const teamToday = Object.keys(weekRoomOf).filter(sid=> weekRoomOf[sid]===area && !isLockedOn(sid, ds));
+        const hasInchargeToday = teamToday.some(sid=>{
+          const isWeeklyIncharge = (md.incharge[area]===sid) || weekIsActing[sid];
+          return isWeeklyIncharge;
+        });
+        if(teamToday.length>0 && !hasInchargeToday){
+          // this week's incharge (fixed or acting) happens to be locked just today -> find a same-day acting incharge, preferring this week's own room team
+          let dayCandidateIds = teamToday.filter(sid=>{
+            const s=staffById(sid);
+            return s.type==='RN' && s.inch[area];
+          });
+          if(dayCandidateIds.length===0 && ROOM4.includes(area)){
+            // widen to any available ห้อง4 staff today (not just this week's R1/Open team) before ever touching RR
+            dayCandidateIds = rnAll.filter(s=> !isLockedOn(s.id, ds) && weekRoomOf[s.id] && ROOM4.includes(weekRoomOf[s.id])
+              && s.comp[area] && s.inch[area]).map(s=>s.id);
+          }
+          if(dayCandidateIds.length>0){
+            dayCandidateIds.sort((a,b)=> (actingCount[a]||0)-(actingCount[b]||0));
+            const pickId = dayCandidateIds[0];
+            setAssign(md, pickId, ds, area, true);
+            actingCount[pickId] = (actingCount[pickId]||0)+1;
+          } else {
+            conflicts.push({level:'warn', date:ds, msg:`${d} — Incharge ${AREA_LABEL[area]} ประจำสัปดาห์ติดธุระวันนี้ และไม่พบ Acting Incharge เฉพาะวันเพิ่มเติม`});
+          }
+        }
+        // staffing minimum check for the day
+        const need = area==='RR' ? {rn:3,pn:0} : {rn:2,pn:1};
+        const rnToday = teamToday.filter(sid=>staffById(sid).type==='RN').length;
+        const pnToday = teamToday.filter(sid=>staffById(sid).type==='PN').length;
+        if(rnToday<need.rn) conflicts.push({level:'error', date:ds, msg:`${d} — RN ${AREA_LABEL[area]} เหลือ ${rnToday} / ต้องการขั้นต่ำ ${need.rn}`});
+        if(need.pn && pnToday<need.pn) conflicts.push({level:'error', date:ds, msg:`${d} — PN ${AREA_LABEL[area]} เหลือ ${pnToday} / ต้องการขั้นต่ำ ${need.pn}`});
+      });
+    });
   });
 
   md.actingLog = actingCount;
@@ -1220,6 +1298,7 @@ function autoAssignMonth(mk){
   md.autoAssignedAt = new Date().toISOString();
   return conflicts;
 }
+
 
 document.getElementById('btnAutoAssign').addEventListener('click', async ()=>{
   const conflicts = autoAssignMonth(currentMonthKey);
@@ -1307,10 +1386,17 @@ function openCellEditor(staffId, ds){
   const md = ensureMonth(currentMonthKey);
   const root = document.getElementById('modalRoot');
   const opts = ['R1','Open','RR','X','vac','อบรม','OD','—'];
+  const {y,m} = parseMonthKey(currentMonthKey);
+  const dayNum = Number(ds.slice(8,10));
+  const weekDays = weekDaysContaining(y,m,dayNum);
   root.innerHTML = `<div class="modal-backdrop" onclick="if(event.target===this) closeModal();">
     <div class="modal">
       <h3>${s.name} — ${ds}</h3>
+      <p class="muted" style="margin:0 0 6px;">เฉพาะวันนี้:</p>
       <div class="opts">${opts.map(o=>`<button onclick="applyCellEdit('${staffId}','${ds}','${o}')">${o}</button>`).join('')}</div>
+      ${weekDays.length>1 ? `
+      <p class="muted" style="margin:12px 0 6px;">ตั้งทั้งสัปดาห์นี้ (${weekDays[0]}–${weekDays[weekDays.length-1]} ${thaiMonthName(m)}) เป็น:</p>
+      <div class="opts">${['R1','Open','RR'].map(o=>`<button onclick="applyWeekEdit('${staffId}','${ds}','${o}')">${o}</button>`).join('')}</div>` : ''}
       <div class="muted" id="cellEditMsg"></div>
       <div style="text-align:right; margin-top:10px;"><button onclick="closeModal()">ปิด</button></div>
     </div>
@@ -1346,6 +1432,36 @@ async function applyCellEdit(staffId, ds, val){
   closeModal();
   renderDashboard();
   toast('อัปเดตแล้ว');
+}
+
+async function applyWeekEdit(staffId, ds, area){
+  const s = staffById(staffId);
+  const md = ensureMonth(currentMonthKey);
+  if(area==='RR' && s.type==='PN'){
+    document.getElementById('cellEditMsg').textContent = 'ไม่สามารถจัด PN เข้า RR ได้';
+    return;
+  }
+  const {y,m} = parseMonthKey(currentMonthKey);
+  const dayNum = Number(ds.slice(8,10));
+  const weekDays = weekDaysContaining(y,m,dayNum);
+  const weekDs = weekDays.map(d=>dstr(y,m,d));
+  // pair conflict check across the whole week against whoever else is already in that area on any of those days
+  for(const wds of weekDs){
+    if(getStatus(md, staffId, wds)) continue; // locked that day, will be skipped anyway
+    const usedThatDay = new Set(STATE.staff.filter(x=>{const a=getAssign(md,x.id,wds); return a && x.id!==staffId;}).map(x=>x.id));
+    if(pairConflictExists(md, wds, area, staffId, usedThatDay)){
+      document.getElementById('cellEditMsg').textContent = `มีข้อจำกัดคู่ในวันที่ ${wds.slice(8,10)} — ไม่สามารถตั้งทั้งสัปดาห์ได้`;
+      return;
+    }
+  }
+  weekDs.forEach(wds=>{
+    if(getStatus(md, staffId, wds)) return; // keep locked days as-is (vac/X/อบรม/OD)
+    setAssign(md, staffId, wds, area, false);
+  });
+  await saveAll(false);
+  closeModal();
+  renderDashboard();
+  toast('ตั้งค่าทั้งสัปดาห์แล้ว');
 }
 
 document.getElementById('btnConfirmSchedule').addEventListener('click', async ()=>{
