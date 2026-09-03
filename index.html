@@ -202,6 +202,7 @@
   <button data-tab="dashboard" class="active">ตารางประจำเดือน</button>
   <button data-tab="staff">จัดการเจ้าหน้าที่</button>
   <button data-tab="pairs">ข้อจำกัดคู่</button>
+  <button data-tab="holidays">วันหยุดนักขัตฤกษ์</button>
   <button data-tab="wizard">เตรียมข้อมูลรายเดือน</button>
   <button data-tab="conflicts">ข้อขัดแย้ง</button>
   <button data-tab="report">รายงานสรุป</button>
@@ -293,6 +294,30 @@
         <div class="field"><label>&nbsp;</label><button id="btnAddPair" class="primary">เพิ่มข้อจำกัด</button></div>
       </div>
       <ul class="entry-list" id="pairList"></ul>
+    </div>
+  </section>
+
+  <!-- HOLIDAYS -->
+  <section id="panel-holidays" class="panel">
+    <div class="card">
+      <h2>🗓️ วันหยุดนักขัตฤกษ์</h2>
+      <p class="muted">ระบบจะไม่จัดเวรวันเสาร์-อาทิตย์อยู่แล้วโดยอัตโนมัติ ส่วนวันหยุดนักขัตฤกษ์ให้เพิ่มไว้ที่นี่ — ตารางประจำเดือนและ Auto Assign จะข้ามวันเหล่านี้ไปด้วย</p>
+      <div class="row">
+        <button id="btnLoadHolidayPreset" class="primary">📥 โหลดวันหยุดราชการไทย 2569 (2026)</button>
+      </div>
+      <h3>เพิ่มวันหยุดเอง</h3>
+      <div class="row">
+        <div class="field"><label>วันที่</label><input type="date" id="holDate"></div>
+        <div class="field"><label>ชื่อวันหยุด</label><input type="text" id="holName" placeholder="เช่น วันหยุดพิเศษของหน่วยงาน" autocomplete="off"></div>
+        <div class="field"><label>&nbsp;</label><button id="btnAddHoliday" class="primary">เพิ่มวันหยุด</button></div>
+      </div>
+      <h3>รายการวันหยุดทั้งหมด</h3>
+      <div style="overflow:auto;">
+      <table id="holidayTable">
+        <thead><tr><th>วันที่</th><th>ชื่อ</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+      </div>
     </div>
   </section>
 
@@ -405,9 +430,9 @@ const AREA_LABEL = {R1:'R1 (Laparo)', Open:'Open', RR:'RR (Recovery)'};
 const ROOM4 = ['R1','Open'];
 const LOCK_TYPES = ['vac','X','อบรม','OD'];
 const WEEKDAY_TH = ['อา','จ','อ','พ','พฤ','ศ','ส'];
-const STORE_KEYS = { STAFF:'staff-list', PAIRS:'pair-restrictions', MONTHS:'month-index' };
+const STORE_KEYS = { STAFF:'staff-list', PAIRS:'pair-restrictions', MONTHS:'month-index', HOLIDAYS:'holidays' };
 
-let STATE = { staff: [], pairs: [], months: {} }; // months: { 'YYYY-M': monthDataObject }
+let STATE = { staff: [], pairs: [], months: {}, holidays: [] }; // holidays: [{date:'YYYY-MM-DD', name:'...'}]
 let currentMonthKey = null;
 let lastConflicts = [];
 
@@ -500,7 +525,7 @@ function subscribeRealtime(){
 /* ---- Manual backup: export / import full state as a .json file ----
    Useful as an extra safety net regardless of which backend is active. */
 function exportBackup(){
-  const payload = { staff: STATE.staff, pairs: STATE.pairs, months: STATE.months, exportedAt: new Date().toISOString() };
+  const payload = { staff: STATE.staff, pairs: STATE.pairs, months: STATE.months, holidays: STATE.holidays, exportedAt: new Date().toISOString() };
   const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -519,6 +544,7 @@ async function importBackupFile(file){
   STATE.staff = data.staff || [];
   STATE.pairs = data.pairs || [];
   STATE.months = data.months || {};
+  STATE.holidays = data.holidays || [];
   await saveAll(false);
   currentMonthKey = null;
   populateMonthSelect();
@@ -531,6 +557,7 @@ async function saveAll(showToast){
   await storageSet(STORE_KEYS.STAFF, STATE.staff);
   await storageSet(STORE_KEYS.PAIRS, STATE.pairs);
   await storageSet(STORE_KEYS.MONTHS, Object.keys(STATE.months));
+  await storageSet(STORE_KEYS.HOLIDAYS, STATE.holidays);
   for(const mk of Object.keys(STATE.months)){
     await storageSet('month:'+mk, STATE.months[mk]);
   }
@@ -540,6 +567,7 @@ async function saveAll(showToast){
 async function loadAll(){
   STATE.staff = await storageGet(STORE_KEYS.STAFF, null);
   STATE.pairs = await storageGet(STORE_KEYS.PAIRS, []);
+  STATE.holidays = await storageGet(STORE_KEYS.HOLIDAYS, []);
   const monthKeys = await storageGet(STORE_KEYS.MONTHS, []);
   STATE.months = {};
   for(const mk of monthKeys){
@@ -563,9 +591,18 @@ function monthKeyOf(y,m){ return `${y}-${pad2(m+1)}`; }
 function parseMonthKey(mk){ const [y,m]=mk.split('-').map(Number); return {y, m:m-1}; }
 function daysInMonth(y,m){ return new Date(y,m+1,0).getDate(); }
 function isWeekend(y,m,d){ const wd=new Date(y,m,d).getDay(); return wd===0||wd===6; }
+function isHoliday(y,m,d){
+  const ds = dstr(y,m,d);
+  return STATE.holidays.some(h=>h.date===ds);
+}
+function holidayName(y,m,d){
+  const ds = dstr(y,m,d);
+  const h = STATE.holidays.find(h=>h.date===ds);
+  return h ? h.name : null;
+}
 function workingDays(y,m){
   const n=daysInMonth(y,m); const out=[];
-  for(let d=1; d<=n; d++){ if(!isWeekend(y,m,d)) out.push(d); }
+  for(let d=1; d<=n; d++){ if(!isWeekend(y,m,d) && !isHoliday(y,m,d)) out.push(d); }
   return out;
 }
 function mondayKeyOf(y,m,d){
@@ -610,6 +647,76 @@ function experienceGroup(years){
 }
 function staffById(id){ return STATE.staff.find(s=>s.id===id); }
 function activeStaff(){ return STATE.staff.filter(s=>s.active); }
+
+/* ===================== HOLIDAYS ===================== */
+// Official Thai public holidays for 2026 (พ.ศ. 2569), per government/BOT calendar.
+// Users can still add/remove dates to match their own hospital's actual closures.
+const THAI_HOLIDAYS_2026 = [
+  {date:'2026-01-01', name:'วันขึ้นปีใหม่'},
+  {date:'2026-01-02', name:'วันหยุดชดเชยวันขึ้นปีใหม่ (กรณีพิเศษ)'},
+  {date:'2026-03-03', name:'วันมาฆบูชา'},
+  {date:'2026-04-06', name:'วันจักรี'},
+  {date:'2026-04-13', name:'วันสงกรานต์'},
+  {date:'2026-04-14', name:'วันสงกรานต์'},
+  {date:'2026-04-15', name:'วันสงกรานต์'},
+  {date:'2026-05-01', name:'วันแรงงานแห่งชาติ'},
+  {date:'2026-05-04', name:'วันฉัตรมงคล'},
+  {date:'2026-05-09', name:'วันพืชมงคล'},
+  {date:'2026-05-31', name:'วันวิสาขบูชา'},
+  {date:'2026-07-28', name:'วันเฉลิมพระชนมพรรษา ร.10'},
+  {date:'2026-07-29', name:'วันอาสาฬหบูชา'},
+  {date:'2026-07-30', name:'วันเข้าพรรษา'},
+  {date:'2026-08-12', name:'วันแม่แห่งชาติ'},
+  {date:'2026-10-13', name:'วันคล้ายวันสวรรคต ร.9'},
+  {date:'2026-10-16', name:'วันหยุดพิเศษเพิ่มเติม (มติ ครม.)'},
+  {date:'2026-10-23', name:'วันปิยมหาราช'},
+  {date:'2026-12-05', name:'วันพ่อแห่งชาติ / วันชาติ'},
+  {date:'2026-12-10', name:'วันรัฐธรรมนูญ'},
+  {date:'2026-12-31', name:'วันสิ้นปี'}
+];
+async function loadHolidayPreset(){
+  let added=0;
+  THAI_HOLIDAYS_2026.forEach(h=>{
+    if(!STATE.holidays.some(x=>x.date===h.date)){ STATE.holidays.push({...h}); added++; }
+  });
+  STATE.holidays.sort((a,b)=>a.date.localeCompare(b.date));
+  await saveAll(false);
+  toast(`เพิ่มวันหยุดราชการไทย 2569 แล้ว ${added} วัน`);
+  renderHolidaysTab();
+  renderAll();
+}
+async function addHoliday(){
+  const date = document.getElementById('holDate').value;
+  const name = document.getElementById('holName').value.trim() || 'วันหยุดพิเศษ';
+  if(!date){ toast('กรุณาเลือกวันที่'); return; }
+  if(STATE.holidays.some(h=>h.date===date)){ toast('มีวันหยุดนี้อยู่แล้ว'); return; }
+  STATE.holidays.push({date, name});
+  STATE.holidays.sort((a,b)=>a.date.localeCompare(b.date));
+  await saveAll(false);
+  document.getElementById('holDate').value='';
+  document.getElementById('holName').value='';
+  renderHolidaysTab();
+  renderAll();
+}
+async function removeHoliday(date){
+  STATE.holidays = STATE.holidays.filter(h=>h.date!==date);
+  await saveAll(false);
+  renderHolidaysTab();
+  renderAll();
+}
+function renderHolidaysTab(){
+  const tbody = document.querySelector('#holidayTable tbody');
+  if(!tbody) return;
+  if(STATE.holidays.length===0){
+    tbody.innerHTML = `<tr><td colspan="3" class="muted">ยังไม่มีวันหยุดนักขัตฤกษ์ในระบบ</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = STATE.holidays.map(h=>{
+    const d = new Date(h.date+'T00:00:00');
+    const disp = `${d.getDate()} ${thaiMonthName(d.getMonth())} ${beYear(d.getFullYear())}`;
+    return `<tr><td>${disp}</td><td>${h.name}</td><td><button onclick="removeHoliday('${h.date}')">ลบ</button></td></tr>`;
+  }).join('');
+}
 
 function ensureMonth(mk){
   if(!STATE.months[mk]){
@@ -722,6 +829,7 @@ document.querySelectorAll('nav.tabs button').forEach(btn=>{
     if(btn.dataset.tab==='staff') renderStaffTab();
     if(btn.dataset.tab==='pairs') renderPairsTab();
     if(btn.dataset.tab==='dashboard') renderDashboard();
+    if(btn.dataset.tab==='holidays') renderHolidaysTab();
   });
 });
 
@@ -900,6 +1008,9 @@ async function removePair(i){
   await saveAll(true);
   renderPairsTab();
 }
+
+document.getElementById('btnLoadHolidayPreset').addEventListener('click', loadHolidayPreset);
+document.getElementById('btnAddHoliday').addEventListener('click', addHoliday);
 
 /* ===================== WIZARD: RANGE HELPERS ===================== */
 function dateRange(fromStr, toStr){
@@ -1622,6 +1733,7 @@ function renderAll(){
   renderDashboard();
   renderStaffTab();
   renderPairsTab();
+  renderHolidaysTab();
   renderWizard();
   renderConflicts();
   renderReport();
